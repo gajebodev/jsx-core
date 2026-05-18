@@ -9,14 +9,6 @@ export type { RouteContext, RouteConfig } from "./router";
 export { createStore, bindStoreText } from "./store";
 export type { Store } from "./store";
 
-// Virtual List
-export { createVirtualList } from "./virtual-list";
-export type { VirtualListProps } from "./virtual-list";
-
-// Table
-export { createTable, createStyledText } from "./table";
-export type { Column, TableProps } from "./table";
-
 // Class name utility
 export { cx } from "./cx";
 
