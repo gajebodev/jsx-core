@@ -1,0 +1,88 @@
+name: Publish Package
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - package.json
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://npm.pkg.github.com
+          scope: '@gajebodev'
+
+      - name: Detect version change
+        id: version_check
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          current_version=$(node -p "require('./package.json').version")
+
+          if git rev-parse --verify HEAD^ >/dev/null 2>&1; then
+            previous_version=$(git show HEAD^:package.json | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version")
+          else
+            previous_version=""
+          fi
+
+          echo "current_version=${current_version}" >> "$GITHUB_OUTPUT"
+          echo "previous_version=${previous_version}" >> "$GITHUB_OUTPUT"
+
+          if [ "$current_version" != "$previous_version" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checks if version is unchanged
+        if: steps.version_check.outputs.changed != 'true'
+        run: |
+          echo "No version change detected in package.json. Skipping publish."
+
+      - name: Install dependencies
+        if: steps.version_check.outputs.changed == 'true'
+        run: npm ci
+
+      - name: Build package
+        if: steps.version_check.outputs.changed == 'true'
+        run: npm run build
+
+      - name: Publish to GitHub Packages
+        if: steps.version_check.outputs.changed == 'true'
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Release
+        if: steps.version_check.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=v${{ steps.version_check.outputs.current_version }}
+
+          gh release create "$VERSION" \
+            --title "$VERSION" \
+            --generate-notes
+
