@@ -1,6 +1,8 @@
-# SPA Library
+# @gajebodev/jsx-core
 
-A lightweight, framework-agnostic library for building Single Page Applications. No React or Vue dependencies required.
+A lightweight, framework-agnostic library for building Single Page Applications.
+
+No React or Vue dependencies required.
 
 ## Features
 
@@ -16,6 +18,17 @@ A lightweight, framework-agnostic library for building Single Page Applications.
 npm install @gajebodev/jsx-core
 ```
 
+Use the runtime by setting `jsxImportSource` to `@gajebodev/jsx-core` in tsconfig.json.
+
+```json
+{
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "@gajebodev/jsx-core"
+  }
+}
+```
+
 ## Usage
 
 ### Components
@@ -25,7 +38,7 @@ import { createComponent, useState } from '@gajebodev/jsx-core';
 
 const Counter = createComponent(({ rerender }) => {
   const [count, setCount] = useState(0);
-  
+
   return (
     <div>
       <p>Count: {count}</p>
@@ -63,16 +76,16 @@ router.mount(document.getElementById('outlet')!);
 ### Store
 
 ```typescript
-import { createStore, bindStoreText } from '@gajebodev/jsx-core';
+import { createStore, bindStoreText } from "@gajebodev/jsx-core";
 
 const appStore = createStore({
   count: 0,
-  name: 'App',
+  name: "App",
 });
 
 // Subscribe to changes
 const unsubscribe = appStore.subscribe((state) => {
-  console.log('Store updated:', state);
+  console.log("Store updated:", state);
 });
 
 // Update state
@@ -86,12 +99,12 @@ bindStoreText(appStore, (state) => `Count: ${state.count}`, element);
 ### Class Names
 
 ```typescript
-import { cx } from '@gajebodev/jsx-core';
+import { cx } from "@gajebodev/jsx-core";
 
 const buttonClass = cx(
-  'btn',
-  isPrimary && 'btn-primary',
-  isDisabled && 'btn-disabled'
+  "btn",
+  isPrimary && "btn-primary",
+  isDisabled && "btn-disabled",
 );
 ```
 
