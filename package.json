@@ -1,0 +1,66 @@
+{
+  "name": "@gajebodev/jsx-core",
+  "version": "1.0.0",
+  "description": "Lightweight framework-agnostic SPA core library - component, router, store, and JSX runtime",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gajebodev/jsx-core.git"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./component": {
+      "types": "./dist/component.d.ts",
+      "import": "./dist/component.js"
+    },
+    "./router": {
+      "types": "./dist/router.d.ts",
+      "import": "./dist/router.js"
+    },
+    "./store": {
+      "types": "./dist/store.d.ts",
+      "import": "./dist/store.js"
+    },
+    "./cx": {
+      "types": "./dist/cx.d.ts",
+      "import": "./dist/cx.js"
+    },
+    "./jsx-runtime": {
+      "types": "./dist/jsx-runtime.d.ts",
+      "import": "./dist/jsx-runtime.js"
+    },
+    "./jsx-dev-runtime": {
+      "types": "./dist/jsx-dev-runtime.d.ts",
+      "import": "./dist/jsx-dev-runtime.js"
+    }
+  },
+  "files": [
+    "dist",
+    "package.json",
+    "LICENSE.md",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "spa",
+    "framework",
+    "router",
+    "store",
+    "component",
+    "jsx",
+    "lightweight"
+  ],
+  "author": "Gabriel Jefferson Boltron",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}
