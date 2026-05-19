@@ -63,7 +63,7 @@ jobs:
 
       - name: Install dependencies
         if: steps.version_check.outputs.changed == 'true'
-        run: npm ci
+        run: npm install
 
       - name: Build package
         if: steps.version_check.outputs.changed == 'true'
