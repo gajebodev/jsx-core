@@ -17,6 +17,7 @@ export interface RouteConfig<TData = unknown> {
 
 interface RouterOptions {
   notFound: () => Node;
+  onRouteChange?: (state: { loading: boolean; path: string; name?: string }) => void;
 }
 
 function parseParams(template: string, actual: string): Params | null {
@@ -73,16 +74,15 @@ export function createRouter(routes: RouteConfig<any>[], options: RouterOptions)
 
     const { route, params } = matched;
 
-    const pending = document.createElement("p");
-    pending.style.color = "var(--ink-soft)";
-    pending.textContent = "Loading route...";
-    outlet.replaceChildren(pending);
+    options.onRouteChange?.({ loading: true, path: route.path, name: route.name });
 
     const data = route.loader ? await route.loader({ params, path }) : undefined;
     const module = await route.component();
     const view = await module.default({ params, path, data });
 
     outlet.replaceChildren(view);
+
+    options.onRouteChange?.({ loading: false, path: route.path, name: route.name });
   };
 
   const onClick = (event: MouseEvent) => {
