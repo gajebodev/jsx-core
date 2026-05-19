@@ -54,12 +54,8 @@ jobs:
             echo "changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No version change detected in package.json. Skipping publish."
           fi
-
-      - name: Checks if version is unchanged
-        if: steps.version_check.outputs.changed != 'true'
-        run: |
-          echo "No version change detected in package.json. Skipping publish."
 
       - name: Install dependencies
         if: steps.version_check.outputs.changed == 'true'
