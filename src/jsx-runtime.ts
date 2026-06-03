@@ -1,3 +1,5 @@
+import { __renderWithLifecycle } from "./hooks";
+
 type Primitive = string | number | boolean | null | undefined;
 type Child = Node | Primitive | Child[];
 export type JSXChild = Child;
@@ -139,7 +141,7 @@ function createNode(type: ElementType, props: Props): Node {
   }
 
   if (typeof type === "function") {
-    return type(props);
+    return __renderWithLifecycle(() => type(props));
   }
 
   const el = document.createElement(type);

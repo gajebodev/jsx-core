@@ -6,7 +6,7 @@ No React or Vue dependencies required.
 
 ## Features
 
-- **Component System**: Simple hooks-based component creation with `useState` and `createComponent`
+- **Hooks System**: Standalone reactive `useState` hook with direct DOM sync callbacks
 - **Router**: Lightweight client-side router with lazy loading and route parameters
 - **Store**: Simple reactive store pattern with subscriptions
 - **JSX Runtime**: Custom JSX runtime for element creation
@@ -31,21 +31,50 @@ Use the runtime by setting `jsxImportSource` to `@gajebodev/jsx-core` in tsconfi
 
 ## Usage
 
-### Components
+### Hooks
 
 ```typescript
-import { createComponent, useState } from '@gajebodev/jsx-core';
+import { useState } from '@gajebodev/jsx-core';
 
-const Counter = createComponent(({ rerender }) => {
-  const [count, setCount] = useState(0);
+const [previewRef, setFormValues] = useState<{ name: string; email: string }, HTMLSpanElement>(
+  {
+    name: "",
+    email: ""
+  },
+  (ref, state) => {
+    ref.current?.replaceChildren(`Preview: ${state.name} (${state.email})`);
+  }
+);
 
-  return (
-    <div>
-      <p>Count: {count}</p>
-      <button onClick={() => setCount(count + 1)}>Increment</button>
-    </div>
-  );
+setFormValues({ name: "Ada" });
+setFormValues((state) => ({ email: `${state.name.toLowerCase()}@example.com` }));
+
+const current = setFormValues.get();
+console.log(current.name); // Ada
+
+const unsubscribe = setFormValues.subscribe((ref, state, previous) => {
+  console.log("state changed", previous, state, ref.current);
 });
+
+unsubscribe();
+```
+
+### Lifecycle hooks
+
+```typescript
+import { useMount, useUnmount } from "@gajebodev/jsx-core";
+
+export function Component() {
+  useMount(() => {
+    console.log("mounted once");
+  });
+
+  useUnmount(() => {
+    console.log("unmounted once");
+  });
+
+  return <section>Lifecycle demo</section>;
+}
 ```
 
 ### Router
