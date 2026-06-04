@@ -1,5 +1,8 @@
 // Component utilities
-export { useState, createComponent } from "./component";
+export { useState, useMount, useUnmount } from "./hooks";
+export type { StateHook, StateRef, StateChangeHandler } from "./hooks";
+export { isPlainObject, shallowEqualObjects } from "./utils";
+export type { StatePatch } from "./utils";
 
 // Router
 export { createRouter } from "./router";

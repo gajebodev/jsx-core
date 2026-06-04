@@ -1,8 +1,10 @@
+import { StatePatch, StateUpdater, isPlainObject, resolveNextState, shallowEqualObjects } from "./utils";
+
 type Listener<T> = (state: T) => void;
 
 export interface Store<T> {
   getState: () => T;
-  setState: (patch: Partial<T> | ((prev: T) => T)) => void;
+  setState: (patch: StateUpdater<T>) => void;
   subscribe: (listener: Listener<T>) => () => void;
 }
 
@@ -12,11 +14,22 @@ export function createStore<T>(initial: T): Store<T> {
 
   const getState = () => state;
 
-  const setState = (patch: Partial<T> | ((prev: T) => T)) => {
-    state =
-      typeof patch === "function"
-        ? (patch as (prev: T) => T)(state)
-        : ({ ...state, ...patch } as T);
+  const setState = (patch: StateUpdater<T>) => {
+    const previous = state;
+    const nextPatch = typeof patch === "function"
+      ? (patch as (prev: T) => StatePatch<T>)(previous)
+      : patch;
+    const nextState = resolveNextState(previous, nextPatch);
+
+    if (Object.is(previous, nextState)) {
+      return;
+    }
+
+    if (isPlainObject(previous) && isPlainObject(nextState) && shallowEqualObjects(previous, nextState)) {
+      return;
+    }
+
+    state = nextState;
 
     listeners.forEach((listener) => listener(state));
   };
