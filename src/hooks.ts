@@ -12,9 +12,9 @@ export type StateChangeHandler<T, TElement = unknown> = (
   previous: T
 ) => void;
 
-export type StateHook<T> = StateSetter<T> & {
+export type StateHook<T, TElement = unknown> = StateSetter<T> & {
   get: () => T;
-  subscribe: (listener: StateChangeHandler<T>) => () => void;
+  subscribe: (listener: StateChangeHandler<T, TElement>) => () => void;
 };
 
 type LifecycleCleanup = () => void;
@@ -177,7 +177,7 @@ export function __renderWithLifecycle(render: () => Node) {
 export function useState<T, TElement = unknown>(
   initial: T | (() => T),
   onChange?: StateChangeHandler<T, TElement>
-): readonly [StateRef<TElement>, StateHook<T>] {
+): readonly [StateRef<TElement>, StateHook<T, TElement>] {
   let state = typeof initial === "function" ? (initial as () => T)() : initial;
   const ref: StateRef<TElement> = { current: null };
   const listeners = new Set<StateChangeHandler<T, TElement>>();
@@ -205,7 +205,7 @@ export function useState<T, TElement = unknown>(
     for (const listener of listeners) {
       listener(ref, state, previous);
     }
-  }) as StateHook<T>;
+  }) as StateHook<T, TElement>;
 
   setState.get = () => state;
   setState.subscribe = (listener: StateChangeHandler<T, TElement>) => {
