@@ -1,4 +1,4 @@
-import { __renderWithLifecycle } from "./hooks";
+import { __renderWithLifecycle } from "./lifecycle";
 
 type Primitive = string | number | boolean | null | undefined;
 type Child = Node | Primitive | Child[];
@@ -21,10 +21,7 @@ export type ElementType = string | typeof Fragment | Component;
 declare global {
   namespace JSX {
     interface IntrinsicElements {
-      [elemName: string]: {
-        children?: unknown;
-        [key: string]: unknown;
-      };
+      [elemName: string]: Record<string, unknown>;
     }
     interface Element extends Node {}
   }
@@ -32,137 +29,214 @@ declare global {
 
 function appendChild(parent: Node, child: Child): void {
   if (Array.isArray(child)) {
-    for (const nested of child) {
-      appendChild(parent, nested);
-    }
+    for (const nested of child) appendChild(parent, nested);
     return;
   }
-
-  if (child === null || child === undefined || typeof child === "boolean") {
+  if (child === null || child === undefined || typeof child === "boolean")
     return;
-  }
-
   if (child instanceof Node) {
     parent.appendChild(child);
     return;
   }
-
   parent.appendChild(document.createTextNode(String(child)));
 }
 
+const DOM_PROP_MAP: Record<string, string> = {
+  class: "className",
+  classname: "className",
+  className: "className",
+  htmlfor: "htmlFor",
+  htmlFor: "htmlFor",
+  readonly: "readOnly",
+  readOnly: "readOnly",
+  autofocus: "autoFocus",
+  autoFocus: "autoFocus",
+  autocomplete: "autoComplete",
+  autoComplete: "autoComplete",
+  maxlength: "maxLength",
+  maxLength: "maxLength",
+  minlength: "minLength",
+  minLength: "minLength",
+  tabindex: "tabIndex",
+  tabIndex: "tabIndex"
+};
+
+const LIVE_PROPERTIES = new Set([
+  "value",
+  "checked",
+  "disabled",
+  "muted",
+  "selected",
+  "readOnly",
+  "autoFocus",
+  "autoComplete",
+  "maxLength",
+  "minLength",
+  "tabIndex"
+]);
+
 function setProp(el: HTMLElement, key: string, value: unknown): void {
-  if (key === "className" || key === "class") {
-    if (typeof value === "string") {
-      el.className = value;
-    }
-    return;
-  }
+  // Normalize casing mismatches
+  const lookupKey = key.toLowerCase();
+  const normalizedKey = DOM_PROP_MAP[key] || DOM_PROP_MAP[lookupKey] || key;
 
-  if (key === "htmlFor") {
-    if (value !== null && value !== undefined) {
-      el.setAttribute("for", String(value));
-    }
-    return;
-  }
-
-  if (key === "style") {
+  // Inline Styles
+  if (normalizedKey === "style") {
     if (typeof value === "string") {
       el.setAttribute("style", value);
-      return;
-    }
-
-    if (value && typeof value === "object") {
+    } else if (value && typeof value === "object") {
       Object.assign(el.style, value as StyleObject);
+    } else {
+      el.removeAttribute("style");
     }
     return;
   }
 
-  if (key === "dataset") {
-    if (value && typeof value === "object") {
-      for (const [datasetKey, datasetValue] of Object.entries(value as Record<string, DatasetValue>)) {
-        if (datasetValue === null || datasetValue === undefined) {
-          delete el.dataset[datasetKey];
-          continue;
-        }
-        el.dataset[datasetKey] = String(datasetValue);
-      }
+  // Datasets (Object syntax style: dataset={{ id: 1 }})
+  if (normalizedKey === "dataset" && value && typeof value === "object") {
+    for (const [dKey, dVal] of Object.entries(
+      value as Record<string, DatasetValue>
+    )) {
+      if (dVal === null || dVal === undefined) delete el.dataset[dKey];
+      else el.dataset[dKey] = String(dVal);
     }
     return;
   }
 
-  if (key === "ref") {
-    if (typeof value === "function") {
-      (value as RefCallback)(el);
-      return;
-    }
-
-    if (value && typeof value === "object" && "current" in value) {
+  // Element References
+  if (normalizedKey === "ref") {
+    if (typeof value === "function") (value as RefCallback)(el);
+    else if (value && typeof value === "object" && "current" in value) {
       (value as RefObject).current = el;
     }
     return;
   }
 
-  if (key.startsWith("on") && typeof value === "function") {
-    const eventName = key.slice(2).toLowerCase();
-    el.addEventListener(eventName, value as EventListener);
+  // Safe Event Handlers (Direct property replacement prevents event stacking leaks)
+  if (normalizedKey.startsWith("on") && normalizedKey.length > 2) {
+    const eventName = normalizedKey.slice(2).toLowerCase();
+    (el as any)[`on${eventName}`] = typeof value === "function" ? value : null;
     return;
   }
 
-  if (value === false || value === null || value === undefined) {
-    return;
-  }
+  const attrName =
+    normalizedKey === "className"
+      ? "class"
+      : normalizedKey === "htmlFor"
+        ? "for"
+        : normalizedKey;
 
-  if (value === true) {
-    el.setAttribute(key, "");
-    return;
-  }
-
-  if (key in el && !key.startsWith("data-") && !key.startsWith("aria-")) {
-    try {
-      ((el as unknown) as Record<string, unknown>)[key] = value;
-      return;
-    } catch {
-      // Fall through to setAttribute for read-only or incompatible properties.
+  // Clean Falsy State Clearing (Wipes attributes from DOM when missing or false)
+  if (
+    value === false ||
+    value === null ||
+    value === undefined ||
+    value === ""
+  ) {
+    if (LIVE_PROPERTIES.has(normalizedKey) && normalizedKey in el) {
+      (el as any)[normalizedKey] = normalizedKey === "value" ? "" : false;
     }
+    el.removeAttribute(attrName);
+    return;
   }
 
-  el.setAttribute(key, String(value));
+  // Live JavaScript DOM Properties vs HTML Attributes
+  if (LIVE_PROPERTIES.has(normalizedKey) && normalizedKey in el) {
+    (el as any)[normalizedKey] = value === true ? true : value;
+    return;
+  }
+
+  // Attribute Safe Guard Fallback (Handles data-*, aria-*, and custom keys)
+  el.setAttribute(attrName, value === true ? "" : String(value));
 }
 
-function createNode(type: ElementType, props: Props): Node {
-  const children = props.children;
+// All SVG elements lowercased to match compiled outputs
+const SVG_ELEMENTS = new Set([
+  "svg",
+  "path",
+  "circle",
+  "ellipse",
+  "line",
+  "rect",
+  "polygon",
+  "polyline",
+  "g",
+  "text",
+  "tspan",
+  "defs",
+  "use",
+  "symbol",
+  "marker",
+  "lineargradient",
+  "radialgradient",
+  "stop",
+  "clippath",
+  "mask",
+  "image",
+  "foreignobject"
+]);
+
+function createNode(type: ElementType, props: Props, key?: unknown): Node {
+  // If it's a functional component, inject key back to props so the developer can access it
+  if (typeof type === "function") {
+    if (key !== undefined) {
+      props = { ...props, key };
+    }
+    return __renderWithLifecycle(() => type(props));
+  }
 
   if (type === Fragment) {
     const fragment = document.createDocumentFragment();
-    if (children !== undefined) {
-      appendChild(fragment, children);
+    if (props.children !== undefined) {
+      appendChild(fragment, props.children);
     }
     return fragment;
   }
 
-  if (typeof type === "function") {
-    return __renderWithLifecycle(() => type(props));
+  let el: Element;
+  const tagType = typeof type === "string" ? type.toLowerCase() : "";
+
+  if (SVG_ELEMENTS.has(tagType)) {
+    // Standard SVG elements must keep their explicit lowercase tag format
+    // Special camelCase tags must be passed accurately to createElementNS
+    let svgTag = tagType;
+    if (tagType === "lineargradient") svgTag = "linearGradient";
+    else if (tagType === "radialgradient") svgTag = "radialGradient";
+    else if (tagType === "clippath") svgTag = "clipPath";
+    else if (tagType === "foreignobject") svgTag = "foreignObject";
+
+    el = document.createElementNS("http://www.w3.org/2000/svg", svgTag);
+  } else {
+    el = document.createElement(type as string);
   }
 
-  const el = document.createElement(type);
-  for (const [key, value] of Object.entries(props)) {
-    if (key === "children") {
-      continue;
-    }
-    setProp(el, key, value);
+  // Map incoming standard props
+  for (const [propKey, value] of Object.entries(props)) {
+    if (propKey === "children") continue;
+    setProp(el as HTMLElement, propKey, value);
   }
 
-  if (children !== undefined) {
-    appendChild(el, children);
+  // Explicitly bind compiler-extracted keys as native element attributes
+  if (key !== undefined) {
+    setProp(el as HTMLElement, "key", key);
+  }
+
+  if (props.children !== undefined) {
+    appendChild(el, props.children);
   }
 
   return el;
 }
 
-export function jsx(type: ElementType, props: Props): Node {
-  return createNode(type, props ?? {});
+// Automatic Transform entry specifications expected by esbuild, Vite, SWC, and Babel
+export function jsx(type: ElementType, props: Props, key?: unknown): Node {
+  return createNode(type, props ?? {}, key);
 }
 
-export function jsxs(type: ElementType, props: Props): Node {
-  return createNode(type, props ?? {});
+export function jsxs(type: ElementType, props: Props, key?: unknown): Node {
+  return createNode(type, props ?? {}, key);
+}
+
+export function jsxDEV(type: ElementType, props: Props, key?: unknown): Node {
+  return createNode(type, props ?? {}, key);
 }
