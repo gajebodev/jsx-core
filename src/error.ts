@@ -1,7 +1,7 @@
 import { type JSXChild, appendChild } from "./jsx-runtime";
 
 export interface ErrorBoundaryProps {
-  children: JSXChild;
+  render: () => JSXChild;
   fallback: (error: Error) => JSXChild;
 }
 
@@ -18,32 +18,25 @@ export function ErrorBoundary(props: ErrorBoundaryProps): Node {
     currentNodes = [];
   };
 
-  const appendContent = (content: JSXChild, targetContainer: Node | DocumentFragment, useInsertBefore: boolean) => {
+  const appendContent = (content: JSXChild, targetContainer: Node | DocumentFragment) => {
     if (content === undefined || content === null || typeof content === "boolean")
       return;
 
     const tempContainer = document.createDocumentFragment();
     appendChild(tempContainer, content);
-
     currentNodes = Array.from(tempContainer.childNodes);
-
-    if (useInsertBefore) {
-      targetContainer.insertBefore(tempContainer, anchor);
-    } else {
-      targetContainer.appendChild(tempContainer);
-    }
+    targetContainer.insertBefore(tempContainer, anchor.nextSibling);
   };
 
   try {
-    appendContent(props.children, fragment, false);
+    appendContent(props.render(), fragment);
     isInitialRender = false;
   } catch (err) {
     clearCurrentNodes();
     const error = err instanceof Error ? err : new Error(String(err));
-    // Choose the container depending on whether we crashed during initial render or later
     const container = isInitialRender ? fragment : anchor.parentNode;
     if (container) {
-      appendContent(props.fallback(error), container, !isInitialRender);
+      appendContent(props.fallback(error), container);
     }
   }
 

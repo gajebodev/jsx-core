@@ -261,6 +261,7 @@ export function TodoApp() {
       <ul>
         <For
           each={[store, "todos"]}
+          key={(todo) => todo.id}
           render={(itemPath) => <TodoRow store={store} itemPath={itemPath} />}
         />
       </ul>
@@ -285,12 +286,11 @@ function CrashingWidget() {
 export function Dashboard() {
   return (
     <ErrorBoundary
+      render={() => <CrashingWidget />}
       fallback={(error) => (
         <section class="error-box">Failed to render: {error.message}</section>
       )}
-    >
-      <CrashingWidget />
-    </ErrorBoundary>
+    />
   );
 }
 ```

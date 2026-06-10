@@ -20,7 +20,7 @@ type PathImpl<T, Key extends keyof T> =
 export type Path<T> =
   IsAny<T> extends true ? string : PathImpl<T, keyof T> | (keyof T & string);
 
-type PathValue<T, P extends string> =
+export type PathValue<T, P extends string> =
   IsAny<T> extends true
     ? any
     : P extends `${infer Key}.${infer Rest}`
@@ -47,7 +47,11 @@ export function useReactive<T extends Record<string, any>>(
 
   function createProxy(obj: any, pathPrefix = ""): any {
     return new Proxy(obj, {
-      get(target, key: string) {
+      get(target, key: string | symbol, receiver) {
+        if (typeof key === "symbol") {
+          return Reflect.get(target, key, receiver);
+        }
+
         if (key === "$onChange" && pathPrefix === "") {
           return (cb: (path: string, newValue: any) => void) => {
             listeners.add(cb);
@@ -55,7 +59,7 @@ export function useReactive<T extends Record<string, any>>(
           };
         }
 
-        const val = target[key];
+        const val = Reflect.get(target, key, receiver);
         if (val && typeof val === "object" && !(val instanceof Node)) {
           let cachedProxy = proxyCache.get(val);
           if (!cachedProxy) {
@@ -67,14 +71,17 @@ export function useReactive<T extends Record<string, any>>(
         }
         return val;
       },
-      set(target, key: string, value) {
-        if (target[key] === value)
+      set(target, key: string | symbol, value, receiver) {
+        if (typeof key === "symbol")
+          return Reflect.set(target, key, value, receiver);
+
+        if (Reflect.get(target, key, receiver) === value)
           return true;
 
-        target[key] = value;
+        const ok = Reflect.set(target, key, value, receiver);
         const currentPath = pathPrefix ? `${pathPrefix}.${key}` : key;
         listeners.forEach((callback) => callback(currentPath, value));
-        return true;
+        return ok;
       }
     });
   }

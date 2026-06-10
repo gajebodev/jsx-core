@@ -22,7 +22,7 @@ declare global {
     interface IntrinsicElements {
       [elemName: string]: Record<string, unknown>;
     }
-    interface Element extends Node {}
+    interface Element extends Node { }
   }
 }
 
@@ -126,12 +126,7 @@ function setProp(el: HTMLElement, key: string, value: unknown): void {
         : normalizedKey;
 
   // Clean Falsy State Clearing (Wipes attributes from DOM when missing or false)
-  if (
-    value === false ||
-    value === null ||
-    value === undefined ||
-    value === ""
-  ) {
+  if (value === false || value === null || value === undefined || value === "") {
     if (LIVE_PROPERTIES.has(normalizedKey) && normalizedKey in el) {
       (el as any)[normalizedKey] = normalizedKey === "value" ? "" : false;
     }

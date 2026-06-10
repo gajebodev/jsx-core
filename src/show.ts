@@ -24,45 +24,37 @@ export function Show<T extends Record<string, any>, P extends Path<T>>({
     currentNodes = [];
   };
 
-  const appendContent = (renderFn: () => JSXChild, targetContainer: Node | DocumentFragment, useInsertBefore: boolean) => {
-    // Evaluate the function lazily on demand to generate fresh elements and lifecycles
+  const appendContent = (renderFn: () => JSXChild, targetContainer: Node | DocumentFragment) => {
     const content = renderFn();
     if (content === undefined || content === null || typeof content === "boolean")
       return;
 
     const tempContainer = document.createDocumentFragment();
     appendChild(tempContainer, content);
-
-    // Keep an exact, isolated array map of the live DOM sub-tree 
     currentNodes = Array.from(tempContainer.childNodes);
-
-    if (useInsertBefore) {
-      targetContainer.insertBefore(tempContainer, anchor);
-    } else {
-      targetContainer.appendChild(tempContainer);
-    }
+    targetContainer.insertBefore(tempContainer, anchor.nextSibling);
   };
 
   useReactiveEffect((conditionMet) => {
     if (isInitialRender) {
       //Initial phase: append content straight to the root fragment 
       if (conditionMet) {
-        appendContent(render, fragment, false);
+        appendContent(render, fragment);
       } else if (fallback !== undefined) {
-        appendContent(fallback, fragment, false);
+        appendContent(fallback, fragment);
       }
       isInitialRender = false;
       return;
     }
 
-    // Live runtime update phase: clear live elements and insert using the parent anchor
+    // Runtime update phase: clear live elements and insert using the parent anchor
     if (!anchor.parentNode) return;
     clearCurrentNodes();
 
     if (conditionMet) {
-      appendContent(render, anchor.parentNode, true);
+      appendContent(render, anchor.parentNode);
     } else if (fallback !== undefined) {
-      appendContent(fallback, anchor.parentNode, true);
+      appendContent(fallback, anchor.parentNode);
     }
   }, when);
 
