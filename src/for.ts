@@ -17,23 +17,21 @@ export function For<T extends Record<string, any>, P extends Path<T>>({
   fragment.appendChild(anchor);
 
   let renderedNodes: Node[][] = [];
-  let isInitialRender = true;
   let lastVersion = version;
   const [, targetPath] = each;
 
   useReactiveEffect((currentArray: any) => {
+    if (!anchor.parentNode) return;
+
     const list = Array.isArray(currentArray) ? currentArray : [];
     const listLen = list.length;
     const renderedLen = renderedNodes.length;
-
-    const parentContainer = isInitialRender ? fragment : anchor.parentNode;
-    if (!parentContainer) return;
 
     // Dual-Trigger Reset Condition:
     // - The list size physically changed (pagination, truncation, standard add/delete)
     // - OR the version prop shifted (explicit fresh payload replacement from the server)
     const versionShifted = version !== lastVersion;
-    if (!isInitialRender && (listLen !== renderedLen || versionShifted)) {
+    if (listLen !== renderedLen || versionShifted) {
       for (const group of renderedNodes) {
         for (const node of group) {
           node.parentNode?.removeChild(node);
@@ -65,7 +63,7 @@ export function For<T extends Record<string, any>, P extends Path<T>>({
         const itemNodes = Array.from(tempContainer.childNodes);
         nextNodes.push(itemNodes);
 
-        parentContainer.insertBefore(tempContainer, insertBeforeTarget);
+        anchor.parentNode.insertBefore(tempContainer, insertBeforeTarget);
 
         if (itemNodes.length > 0) {
           insertBeforeTarget = itemNodes[itemNodes.length - 1].nextSibling;
@@ -75,7 +73,6 @@ export function For<T extends Record<string, any>, P extends Path<T>>({
 
     renderedNodes = nextNodes;
     lastVersion = version;
-    isInitialRender = false;
   }, each);
 
   return fragment;

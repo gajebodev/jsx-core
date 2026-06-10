@@ -17,7 +17,6 @@ export function Show<T extends Record<string, any>, P extends Path<T>>({
   fragment.appendChild(anchor);
 
   let currentNodes: Node[] = [];
-  let isInitialRender = true;
 
   const clearCurrentNodes = () => {
     for (const node of currentNodes) node.parentNode?.removeChild(node);
@@ -36,19 +35,8 @@ export function Show<T extends Record<string, any>, P extends Path<T>>({
   };
 
   useReactiveEffect((conditionMet) => {
-    if (isInitialRender) {
-      //Initial phase: append content straight to the root fragment 
-      if (conditionMet) {
-        appendContent(render, fragment);
-      } else if (fallback !== undefined) {
-        appendContent(fallback, fragment);
-      }
-      isInitialRender = false;
-      return;
-    }
-
-    // Runtime update phase: clear live elements and insert using the parent anchor
     if (!anchor.parentNode) return;
+
     clearCurrentNodes();
 
     if (conditionMet) {
