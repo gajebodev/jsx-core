@@ -15,7 +15,6 @@ interface LifecycleEntry {
   unmountCallbacks: LifecycleUnmountCallback[];
 }
 
-// Extend native Node interface to hold a safe internal reference
 interface TrackedNode extends Node {
   __lifecycle_entry__?: LifecycleEntry;
 }
@@ -42,7 +41,6 @@ function fireUnmount(entry: LifecycleEntry) {
   }
 }
 
-// Recursively processes nodes and checks for attached lifecycle targets
 function processDomChanges(nodes: NodeList, isConnecting: boolean) {
   for (const node of Array.from(nodes)) {
     const tracked = node as TrackedNode;
@@ -52,10 +50,22 @@ function processDomChanges(nodes: NodeList, isConnecting: boolean) {
         fireMount(entry);
       } else {
         entry.targets.delete(node);
-        delete tracked.__lifecycle_entry__; // GC cleanup
 
-        const stillConnected = Array.from(entry.targets).some((t) => t.isConnected);
-        if (!stillConnected) fireUnmount(entry);
+        queueMicrotask(() => {
+          // Rescue if the node was reparented synchronously
+          if (node.isConnected) {
+            entry.targets.add(node);
+            return;
+          }
+
+          delete (node as TrackedNode).__lifecycle_entry__;
+
+          // If the set is empty OR nothing is left connected, it's safe to unmount
+          const stillConnected = Array.from(entry.targets).some((t) => t.isConnected);
+          if (entry.targets.size === 0 || !stillConnected) {
+            fireUnmount(entry);
+          }
+        });
       }
     }
 
@@ -67,23 +77,16 @@ function processDomChanges(nodes: NodeList, isConnecting: boolean) {
 }
 
 function ensureLifecycleObserver() {
-  if (
-    lifecycleObserver ||
-    typeof document === "undefined" ||
-    typeof MutationObserver === "undefined"
-  )
+  if (lifecycleObserver || typeof document === "undefined" || typeof MutationObserver === "undefined")
     return;
+
   const root = document.documentElement;
   if (!root) return;
 
   lifecycleObserver = new MutationObserver((mutations) => {
     for (const mutation of mutations) {
-      if (mutation.removedNodes.length > 0) {
-        processDomChanges(mutation.removedNodes, false);
-      }
-      if (mutation.addedNodes.length > 0) {
-        processDomChanges(mutation.addedNodes, true);
-      }
+      if (mutation.removedNodes.length > 0) processDomChanges(mutation.removedNodes, false);
+      if (mutation.addedNodes.length > 0) processDomChanges(mutation.addedNodes, true);
     }
   });
 
@@ -93,6 +96,11 @@ function ensureLifecycleObserver() {
 function registerLifecycle(node: Node, collector: LifecycleCollector) {
   if (collector.mountCallbacks.length === 0 && collector.unmountCallbacks.length === 0)
     return;
+
+  // If a fragment is empty, append a silent comment anchor so we don't leak lifecycles
+  if (node.nodeType === Node.DOCUMENT_FRAGMENT_NODE && node.childNodes.length === 0) {
+    node.appendChild(document.createComment("empty-lifecycle-anchor"));
+  }
 
   const targets =
     node.nodeType === Node.DOCUMENT_FRAGMENT_NODE
@@ -113,7 +121,7 @@ function registerLifecycle(node: Node, collector: LifecycleCollector) {
 
   ensureLifecycleObserver();
 
-  // Microtask check: if elements are inserted synchronously into the live document, mount immediately
+  // If elements are inserted synchronously into the live document, mount immediately
   queueMicrotask(() => {
     if (node.isConnected) {
       fireMount(entry);

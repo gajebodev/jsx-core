@@ -14,7 +14,7 @@ export function For<T extends Record<string, any>, P extends Path<T>>({
   const fragment = document.createDocumentFragment();
   fragment.appendChild(anchor);
 
-  let renderedNodes: Node[] = [];
+  let renderedNodes: Node[][] = [];
   let isInitialRender = true;
   const [, targetPath] = each;
 
@@ -26,7 +26,7 @@ export function For<T extends Record<string, any>, P extends Path<T>>({
     const parentContainer = isInitialRender ? fragment : anchor.parentNode;
     if (!parentContainer) return;
 
-    const nextNodes: Node[] = [];
+    const nextNodes: Node[][] = [];
 
     // Update Existing Nodes & Build New Ones Safely
     for (let i = 0; i < listLen; i++) {
@@ -39,8 +39,9 @@ export function For<T extends Record<string, any>, P extends Path<T>>({
         const tempContainer = document.createDocumentFragment();
         appendChild(tempContainer, rowChild);
 
+        // Keep the nodes isolated together as an item group
         const itemNodes = Array.from(tempContainer.childNodes);
-        for (const node of itemNodes) nextNodes.push(node);
+        nextNodes.push(itemNodes);
 
         if (isInitialRender) {
           parentContainer.appendChild(tempContainer);
@@ -50,11 +51,14 @@ export function For<T extends Record<string, any>, P extends Path<T>>({
       }
     }
 
-    // Clean Up Excess Trailing Nodes (Array Shrank Pass)
+    // Clean Up Excess Trailing Items (Array Shrank Pass)
     if (!isInitialRender && renderedLen > listLen) {
       for (let i = listLen; i < renderedLen; i++) {
-        const nodeToRemove = renderedNodes[i];
-        nodeToRemove.parentNode?.removeChild(nodeToRemove);
+        // Loop through and delete EVERY node belonging to this specific index group
+        const itemNodesToRemove = renderedNodes[i];
+        for (const nodeToRemove of itemNodesToRemove) {
+          nodeToRemove.parentNode?.removeChild(nodeToRemove);
+        }
       }
     }
 

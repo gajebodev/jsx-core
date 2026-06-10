@@ -47,9 +47,7 @@ export function useReactive<T extends Record<string, any>>(
 
   function createProxy(obj: any, pathPrefix = ""): any {
     return new Proxy(obj, {
-      get(target, key: string | symbol) {
-        const val = target[key as string];
-
+      get(target, key: string) {
         if (key === "$onChange" && pathPrefix === "") {
           return (cb: (path: string, newValue: any) => void) => {
             listeners.add(cb);
@@ -57,12 +55,11 @@ export function useReactive<T extends Record<string, any>>(
           };
         }
 
+        const val = target[key];
         if (val && typeof val === "object" && !(val instanceof Node)) {
           let cachedProxy = proxyCache.get(val);
           if (!cachedProxy) {
-            const nextPrefix = pathPrefix
-              ? `${pathPrefix}.${key as string}`
-              : (key as string);
+            const nextPrefix = pathPrefix ? `${pathPrefix}.${key}` : key;
             cachedProxy = createProxy(val, nextPrefix);
             proxyCache.set(val, cachedProxy);
           }
@@ -71,11 +68,11 @@ export function useReactive<T extends Record<string, any>>(
         return val;
       },
       set(target, key: string, value) {
-        if (target[key] === value) return true;
+        if (target[key] === value)
+          return true;
 
         target[key] = value;
         const currentPath = pathPrefix ? `${pathPrefix}.${key}` : key;
-
         listeners.forEach((callback) => callback(currentPath, value));
         return true;
       }

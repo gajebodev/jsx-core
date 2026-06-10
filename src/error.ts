@@ -1,4 +1,4 @@
-import { type JSXChild, appendChild } from "@gajebodev/jsx-core";
+import { type JSXChild, appendChild } from "./jsx-runtime";
 
 export interface ErrorBoundaryProps {
   children: JSXChild;
