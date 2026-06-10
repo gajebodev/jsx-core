@@ -78,10 +78,12 @@ export function useReactive<T extends Record<string, any>>(
         if (Reflect.get(target, key, receiver) === value)
           return true;
 
-        const ok = Reflect.set(target, key, value, receiver);
+        if (!Reflect.set(target, key, value, receiver))
+          return false;
+
         const currentPath = pathPrefix ? `${pathPrefix}.${key}` : key;
         listeners.forEach((callback) => callback(currentPath, value));
-        return ok;
+        return true;
       }
     });
   }
@@ -111,12 +113,12 @@ export function useReactiveEffect<
   [reactiveObj, targetPath]: [ReactiveStore<T>, P]
 ): void {
   const pathSegments = targetPath.split(".");
-  const initialValue = getDeepValue(reactiveObj, pathSegments);
-  callback(initialValue);
 
   let unsubscribe: (() => void) | null = null;
 
   useMount(() => {
+    callback(getDeepValue(reactiveObj, pathSegments));
+
     unsubscribe = reactiveObj.$onChange((changedPath: string) => {
       // Case A: The exact target path changed
       if (changedPath === targetPath) {

@@ -221,7 +221,22 @@ export function AdminGuard() {
 
 ### 6. High-Performance Structural Loops (`<For>`)
 
-Render large array structures efficiently. The loop manager monitors structural size modifications, appending or slicing trailing wrappers, while cell changes map directly to internal row elements via text child paths:
+Render array structures with stable row DOM reuse for same-length updates, plus deterministic full resets when the list shape changes.
+
+API:
+
+```tsx
+<For
+  each={[store, "todos"]}
+  version={optionalRefreshToken}
+  render={(itemPath, index) => <Row itemPath={itemPath} index={index} />}
+/>
+```
+
+Behavior summary:
+- Reuses existing row DOM groups when only inner fields change.
+- Fully rebuilds rows when array length changes.
+- Can also fully rebuild rows when `version` changes (useful for explicit server payload replacement).
 
 ```tsx
 import { useReactive, useReactiveEffect } from "@gajebodev/jsx-core";
@@ -261,7 +276,6 @@ export function TodoApp() {
       <ul>
         <For
           each={[store, "todos"]}
-          key={(todo) => todo.id}
           render={(itemPath) => <TodoRow store={store} itemPath={itemPath} />}
         />
       </ul>
@@ -270,7 +284,7 @@ export function TodoApp() {
 }
 ```
 
-`For` provides `(itemPath, index)` via `render` function prop.
+`For` provides `(itemPath, index)` through `render`, where `itemPath` maps to the reactive row path (for example, `todos.0`, `todos.1`, ...).
 
 ### 7. Error Isolation (`<ErrorBoundary>`)
 

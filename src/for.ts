@@ -1,69 +1,61 @@
 import { type JSXChild, appendChild } from "./jsx-runtime";
-import { useReactiveEffect, ReactiveStore, Path, PathValue } from "./reactive";
+import { useReactiveEffect, ReactiveStore, Path } from "./reactive";
 
 interface ForProps<T extends Record<string, any>, P extends Path<T>> {
   each: [ReactiveStore<T>, P];
-  key: (item: PathValue<T, P>[number]) => unknown;
+  version?: unknown;
   render: (itemPath: string, index: number) => JSXChild;
-}
-
-interface KeyedItemEntry {
-  key: unknown;
-  nodes: Node[];
 }
 
 export function For<T extends Record<string, any>, P extends Path<T>>({
   each,
-  key: keyExtractor,
+  version,
   render
 }: ForProps<T, P>): Node {
   const anchor = document.createComment("for-boundary");
   const fragment = document.createDocumentFragment();
   fragment.appendChild(anchor);
 
-  let renderedItems: KeyedItemEntry[] = [];
+  let renderedNodes: Node[][] = [];
   let isInitialRender = true;
+  let lastVersion = version;
   const [, targetPath] = each;
 
   useReactiveEffect((currentArray: any) => {
     const list = Array.isArray(currentArray) ? currentArray : [];
     const listLen = list.length;
+    const renderedLen = renderedNodes.length;
 
     const parentContainer = isInitialRender ? fragment : anchor.parentNode;
     if (!parentContainer) return;
 
-    // Create maps to track and recycle previous items by key
-    const oldItemMap = new Map<unknown, KeyedItemEntry>();
-    for (const item of renderedItems) {
-      oldItemMap.set(item.key, item);
+    // Dual-Trigger Reset Condition:
+    // - The list size physically changed (pagination, truncation, standard add/delete)
+    // - OR the version prop shifted (explicit fresh payload replacement from the server)
+    const versionShifted = version !== lastVersion;
+    if (!isInitialRender && (listLen !== renderedLen || versionShifted)) {
+      for (const group of renderedNodes) {
+        for (const node of group) {
+          node.parentNode?.removeChild(node);
+        }
+      }
+      renderedNodes = [];
     }
 
-    const nextItems: KeyedItemEntry[] = [];
+    const nextNodes: Node[][] = [];
     let insertBeforeTarget: Node | null = anchor.nextSibling;
+    const currentRenderedLen = renderedNodes.length;
 
-    // First Pass: Match keys, re-index paths, and move/insert DOM elements
     for (let i = 0; i < listLen; i++) {
-      const itemData = list[i];
-      const currentKey = keyExtractor(itemData);
-      const existingItem = oldItemMap.get(currentKey);
-
-      if (existingItem) {
-        // MATCH FOUND: Recycle the existing DOM nodes
-        nextItems.push(existingItem);
-        oldItemMap.delete(currentKey); // Remove from deletion pool
-
-        // Move the nodes to the correct position if they shifted orders
-        for (const node of existingItem.nodes) {
-          if (node.nextSibling !== insertBeforeTarget) {
-            parentContainer.insertBefore(node, insertBeforeTarget);
-          }
-        }
-
-        if (existingItem.nodes.length > 0) {
-          insertBeforeTarget = existingItem.nodes[existingItem.nodes.length - 1].nextSibling;
+      if (i < currentRenderedLen) {
+        // Reuse row DOM subtree for direct field modifications (like checking a box)
+        nextNodes.push(renderedNodes[i]);
+        const group = renderedNodes[i];
+        if (group.length > 0) {
+          insertBeforeTarget = group[group.length - 1].nextSibling;
         }
       } else {
-        // NEW ENTRY: Build fresh nodes using the current index path namespace
+        // Compile clean, index-synchronized bindings for new data rows
         const rowPath = `${targetPath}.${i}`;
         const rowChild = render(rowPath, i);
 
@@ -71,7 +63,7 @@ export function For<T extends Record<string, any>, P extends Path<T>>({
         appendChild(tempContainer, rowChild);
 
         const itemNodes = Array.from(tempContainer.childNodes);
-        nextItems.push({ key: currentKey, nodes: itemNodes });
+        nextNodes.push(itemNodes);
 
         parentContainer.insertBefore(tempContainer, insertBeforeTarget);
 
@@ -81,17 +73,8 @@ export function For<T extends Record<string, any>, P extends Path<T>>({
       }
     }
 
-    // Second Pass: Evict any remaining dead items that left the array
-    if (!isInitialRender) {
-      oldItemMap.forEach((deadItem) => {
-        for (const nodeToRemove of deadItem.nodes) {
-          nodeToRemove.parentNode?.removeChild(nodeToRemove);
-        }
-      });
-    }
-
-    // Keep internal tracking structures synced cleanly
-    renderedItems = nextItems;
+    renderedNodes = nextNodes;
+    lastVersion = version;
     isInitialRender = false;
   }, each);
 
