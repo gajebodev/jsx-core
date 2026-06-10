@@ -1,61 +1,68 @@
-import { JSXChild } from "./jsx-runtime";
+import { type JSXChild, appendChild } from "./jsx-runtime";
 import { useReactiveEffect, ReactiveStore, Path } from "./reactive";
 
 interface ShowProps<T extends Record<string, any>, P extends Path<T>> {
   when: [ReactiveStore<T>, P];
-  fallback?: JSXChild;
-  children: JSXChild;
+  render: () => JSXChild;
+  fallback?: () => JSXChild;
 }
 
 export function Show<T extends Record<string, any>, P extends Path<T>>({
   when,
-  fallback,
-  children
+  render,
+  fallback
 }: ShowProps<T, P>): Node {
   const anchor = document.createComment("show-boundary");
   const fragment = document.createDocumentFragment();
   fragment.appendChild(anchor);
 
   let currentNodes: Node[] = [];
+  let isInitialRender = true;
 
   const clearCurrentNodes = () => {
-    const len = currentNodes.length;
-    for (let i = 0; i < len; i++) {
-      currentNodes[i].parentNode?.removeChild(currentNodes[i]);
-    }
+    for (const node of currentNodes) node.parentNode?.removeChild(node);
     currentNodes = [];
   };
 
-  const appendContent = (content: JSXChild) => {
-    if (content == null || typeof content === "boolean") return;
+  const appendContent = (renderFn: () => JSXChild, targetContainer: Node | DocumentFragment, useInsertBefore: boolean) => {
+    // Evaluate the function lazily on demand to generate fresh elements and lifecycles
+    const content = renderFn();
+    if (content === undefined || content === null || typeof content === "boolean")
+      return;
 
     const tempContainer = document.createDocumentFragment();
-    if (Array.isArray(content)) {
-      const len = content.length;
-      for (let i = 0; i < len; i++) {
-        const nested = content[i];
-        if (nested instanceof Node) tempContainer.appendChild(nested);
-        else tempContainer.appendChild(document.createTextNode(String(nested)));
-      }
-    } else if (content instanceof Node) {
-      tempContainer.appendChild(content);
-    } else {
-      tempContainer.appendChild(document.createTextNode(String(content)));
-    }
+    appendChild(tempContainer, content);
 
+    // Keep an exact, isolated array map of the live DOM sub-tree 
     currentNodes = Array.from(tempContainer.childNodes);
-    anchor.parentNode?.insertBefore(tempContainer, anchor);
+
+    if (useInsertBefore) {
+      targetContainer.insertBefore(tempContainer, anchor);
+    } else {
+      targetContainer.appendChild(tempContainer);
+    }
   };
 
   useReactiveEffect((conditionMet) => {
-    if (!anchor.parentNode) return;
+    if (isInitialRender) {
+      //Initial phase: append content straight to the root fragment 
+      if (conditionMet) {
+        appendContent(render, fragment, false);
+      } else if (fallback !== undefined) {
+        appendContent(fallback, fragment, false);
+      }
+      isInitialRender = false;
+      return;
+    }
 
+    // Live runtime update phase: clear live elements and insert using the parent anchor
+    if (!anchor.parentNode) return;
     clearCurrentNodes();
 
     if (conditionMet) {
-      appendContent(children);
+      appendContent(render, anchor.parentNode, true);
     } else if (fallback !== undefined) {
-      appendContent(fallback);
+      appendContent(fallback, anchor.parentNode, true);
     }
   }, when);
 

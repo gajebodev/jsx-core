@@ -23,6 +23,10 @@
       "types": "./dist/show.d.ts",
       "import": "./dist/show.js"
     },
+    "./error": {
+      "types": "./dist/error.d.ts",
+      "import": "./dist/error.js"
+    },
     "./jsx-runtime": {
       "types": "./dist/jsx-runtime.d.ts",
       "import": "./dist/jsx-runtime.js"

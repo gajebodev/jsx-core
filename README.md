@@ -11,8 +11,9 @@ Unlike traditional Virtual DOM frameworks (like React), components in this archi
 - 🚀 **Single-Execution Components**: Functions evaluate exactly once on setup. No re-rendering overhead.
 - 🧬 **Mutation-Driven Lifecycles**: `useMount` and `useUnmount` connect natively to browser insertions/removals via a background `MutationObserver`.
 - 🔄 **Deep Proxy Reactivity**: Track nested properties and index alterations cleanly using an optimized, cached `useReactive` proxy framework.
-- 🎛️ **Streamlined State Controllers**: Handle controlled/uncontrolled patterns elegantly with `useReactiveValue`.
-- 🦥 **Declarative Structural Views**: Dynamic conditional branches (`<Show>`) and array index managers (`<For>`) prevent DOM tree flickering.
+- 🎛️ **Streamlined State Controllers**: Handle controlled/uncontrolled patterns with `useReactiveValue`.
+- 🧱 **Structural Control Components**: `Show`, `For`, and `ErrorBoundary` provide direct-to-DOM control flow without reconciliation.
+- 🧭 **Built-In Router and Store Utilities**: `createRouter`, `createStore`, and `$text` cover common SPA needs.
 
 ## Installation
 
@@ -29,6 +30,35 @@ Configure your compilation pipeline by modifying your **`tsconfig.json`** to del
     "jsxImportSource": "@gajebodev/jsx-core"
   }
 }
+```
+
+## Public API
+
+### Root exports
+
+```ts
+import {
+  jsx,
+  appendChild,
+  Fragment,
+  useMount,
+  useUnmount,
+  useReactive,
+  useReactiveEffect,
+  useReactiveValue,
+  createRouter,
+  createStore,
+  $text,
+  cx
+} from "@gajebodev/jsx-core";
+```
+
+### Subpath exports
+
+```ts
+import { For } from "@gajebodev/jsx-core/for";
+import { Show } from "@gajebodev/jsx-core/show";
+import { ErrorBoundary } from "@gajebodev/jsx-core/error";
 ```
 
 ## Core Ecosystem Guides
@@ -129,7 +159,7 @@ export function ToggleSwitch(props: ToggleProps) {
 For global pub/sub variables or declarative micro-stores, leverage high-performance structural publishers paired with inline child evaluation text nodes:
 
 ```tsx
-import { createStore, \$text } from "@gajebodev/jsx-core";
+import { createStore, $text } from "@gajebodev/jsx-core";
 
 // Create a globally accessible subscription-based warehouse store
 export const configStore = createStore({
@@ -141,7 +171,7 @@ export function Sidebar() {
   return (
     <aside class="panel">
       {/* Declarative Text Node Binder updates natively, skipping component reruns */}
-      <h3>Welcome, {\$text(configStore, (s) => s.user)}</h3>
+      <h3>Welcome, {$text(configStore, (s) => s.user)}</h3>
 
       <button onClick={() => configStore.setState({ user: "Admin" })}>
         Elevate Permissions
@@ -173,18 +203,21 @@ export function AdminGuard() {
       {/* Conditionally attaches or detaches nodes from the live DOM tree */}
       <Show
         when={[session, "user.isAuthorized"]}
-        fallback={
+        render={() => (
+          <div class="secure-panel">
+            <h2>🔒 Administrative Dashboard</h2>
+          </div>
+        )}
+        fallback={() => (
           <p class="error">⛔ Access Denied. Authorization Required.</p>
-        }
-      >
-        <div class="secure-panel">
-          <h2>🔒 Administrative Dashboard</h2>
-        </div>
-      </Show>
+        )}
+      />
     </main>
   );
 }
 ```
+
+`Show` expects `render` and optional `fallback` functions so it can lazily generate fresh content when conditions toggle.
 
 ### 6. High-Performance Structural Loops (`<For>`)
 
@@ -226,11 +259,38 @@ export function TodoApp() {
       </button>
 
       <ul>
-        <For each={[store, "todos"]}>
-          {(itemPath) => <TodoRow store={store} itemPath={itemPath} />}
-        </For>
+        <For
+          each={[store, "todos"]}
+          render={(itemPath) => <TodoRow store={store} itemPath={itemPath} />}
+        />
       </ul>
     </div>
+  );
+}
+```
+
+`For` provides `(itemPath, index)` via `render` function prop.
+
+### 7. Error Isolation (`<ErrorBoundary>`)
+
+Catch synchronous render-time errors and switch to a fallback view:
+
+```tsx
+import { ErrorBoundary } from "@gajebodev/jsx-core/error";
+
+function CrashingWidget() {
+  throw new Error("Widget failed");
+}
+
+export function Dashboard() {
+  return (
+    <ErrorBoundary
+      fallback={(error) => (
+        <section class="error-box">Failed to render: {error.message}</section>
+      )}
+    >
+      <CrashingWidget />
+    </ErrorBoundary>
   );
 }
 ```
@@ -245,15 +305,20 @@ import { createRouter } from '@gajebodev/jsx-core';
 const router = createRouter([
   {
     path: '/dashboard',
+    name: 'dashboard',
     component: () => import('./pages/dashboard'),
   },
   {
     path: '/item/:id',
+    name: 'item-detail',
     component: () => import('./pages/item'),
     loader: ({ params }) => fetch(`/api/items/${params.id}`),
   }
 ], {
-  notFound: () => <div class="err-404">Layout Location Missing</div>
+  notFound: () => <div class="err-404">Layout Location Missing</div>,
+  onRouteChange: ({ loading, path, name }) => {
+    console.log('route state', { loading, path, name });
+  }
 });
 
 router.mount(document.getElementById('root')!);

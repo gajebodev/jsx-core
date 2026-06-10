@@ -2,7 +2,7 @@
 export { jsxDEV } from "./jsx-dev-runtime";
 
 // JSX runtime
-export { jsx, Fragment } from "./jsx-runtime";
+export { jsx, appendChild, Fragment } from "./jsx-runtime";
 export type { JSXChild, ElementType } from "./jsx-runtime";
 
 // Lifecycle

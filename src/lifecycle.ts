@@ -8,6 +8,7 @@ interface LifecycleCollector {
 }
 
 interface LifecycleEntry {
+  targets: Set<Node>;
   mounted: boolean;
   unmounted: boolean;
   mountCallbacks: LifecycleMountCallback[];
@@ -45,13 +46,16 @@ function fireUnmount(entry: LifecycleEntry) {
 function processDomChanges(nodes: NodeList, isConnecting: boolean) {
   for (const node of Array.from(nodes)) {
     const tracked = node as TrackedNode;
-
-    if (tracked.__lifecycle_entry__) {
+    const entry = tracked.__lifecycle_entry__;
+    if (entry) {
       if (isConnecting) {
-        fireMount(tracked.__lifecycle_entry__);
+        fireMount(entry);
       } else {
-        fireUnmount(tracked.__lifecycle_entry__);
+        entry.targets.delete(node);
         delete tracked.__lifecycle_entry__; // GC cleanup
+
+        const stillConnected = Array.from(entry.targets).some((t) => t.isConnected);
+        if (!stillConnected) fireUnmount(entry);
       }
     }
 
@@ -87,26 +91,24 @@ function ensureLifecycleObserver() {
 }
 
 function registerLifecycle(node: Node, collector: LifecycleCollector) {
-  if (
-    collector.mountCallbacks.length === 0 &&
-    collector.unmountCallbacks.length === 0
-  )
+  if (collector.mountCallbacks.length === 0 && collector.unmountCallbacks.length === 0)
     return;
 
+  const targets =
+    node.nodeType === Node.DOCUMENT_FRAGMENT_NODE
+      ? new Set(Array.from(node.childNodes))
+      : new Set([node]);
+
   const entry: LifecycleEntry = {
+    targets,
     mounted: false,
     unmounted: false,
     mountCallbacks: [...collector.mountCallbacks],
     unmountCallbacks: [...collector.unmountCallbacks]
   };
 
-  // If it's a DocumentFragment, assign the entry to all its direct child nodes
-  if (node.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
-    for (const child of Array.from(node.childNodes)) {
-      (child as TrackedNode).__lifecycle_entry__ = entry;
-    }
-  } else {
-    (node as TrackedNode).__lifecycle_entry__ = entry;
+  for (const target of targets) {
+    (target as TrackedNode).__lifecycle_entry__ = entry;
   }
 
   ensureLifecycleObserver();
@@ -115,13 +117,13 @@ function registerLifecycle(node: Node, collector: LifecycleCollector) {
   queueMicrotask(() => {
     if (node.isConnected) {
       fireMount(entry);
-    } else if (node.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
-      // For fragments, verify if their child elements have transitioned safely into the connected DOM
-      for (const child of Array.from(node.childNodes)) {
-        if (child.isConnected) {
-          fireMount(entry);
-          break;
-        }
+      return;
+    }
+
+    for (const target of entry.targets) {
+      if (target.isConnected) {
+        fireMount(entry);
+        break;
       }
     }
   });

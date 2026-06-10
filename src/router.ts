@@ -27,14 +27,15 @@ interface RouterOptions {
 function parseParams(template: string, actual: string): Params | null {
   const templateParts = template.split("/").filter(Boolean);
   const actualParts = actual.split("/").filter(Boolean);
+  const tempLength = templateParts.length;
 
-  if (templateParts.length !== actualParts.length) {
+  if (tempLength !== actualParts.length) {
     return null;
   }
 
   const params: Params = {};
 
-  for (let i = 0; i < templateParts.length; i += 1) {
+  for (let i = 0; i < tempLength; i += 1) {
     const t = templateParts[i];
     const a = actualParts[i];
 

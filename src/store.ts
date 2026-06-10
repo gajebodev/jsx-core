@@ -1,6 +1,6 @@
 import { useMount, useUnmount } from "./lifecycle";
 
-type StatePatch<T> = T extends object ? Partial<T> : T;
+type StatePatch<T> = T extends object ? Partial<T> | T : T;
 export type StateUpdater<T> = StatePatch<T> | ((prev: T) => StatePatch<T>);
 type Listener<T> = (state: T) => void;
 

@@ -1,11 +1,10 @@
 import { __renderWithLifecycle } from "./lifecycle";
 
 type Primitive = string | number | boolean | null | undefined;
-type Child = Node | Primitive | Child[];
-export type JSXChild = Child;
+export type JSXChild = Node | Primitive | JSXChild[];
 
 type Props = {
-  children?: Child;
+  children?: JSXChild;
   [key: string]: unknown;
 };
 
@@ -27,13 +26,13 @@ declare global {
   }
 }
 
-function appendChild(parent: Node, child: Child): void {
+export function appendChild(parent: Node, child: JSXChild): void {
+  if (child === null || child === undefined || typeof child === "boolean")
+    return;
   if (Array.isArray(child)) {
     for (const nested of child) appendChild(parent, nested);
     return;
   }
-  if (child === null || child === undefined || typeof child === "boolean")
-    return;
   if (child instanceof Node) {
     parent.appendChild(child);
     return;
