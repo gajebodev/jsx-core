@@ -43,7 +43,7 @@ export function useReactive<T extends Record<string, any>>(
   initialObj: T
 ): ReactiveStore<T> {
   const listeners = new Set<(path: string, newValue: any) => void>();
-  const proxyCache = new WeakMap<object, any>();
+  const proxyCache = new WeakMap<object, Map<string, any>>();
 
   function createProxy(obj: any, pathPrefix = ""): any {
     return new Proxy(obj, {
@@ -61,12 +61,20 @@ export function useReactive<T extends Record<string, any>>(
 
         const val = Reflect.get(target, key, receiver);
         if (val && typeof val === "object" && !(val instanceof Node)) {
-          let cachedProxy = proxyCache.get(val);
-          if (!cachedProxy) {
-            const nextPrefix = pathPrefix ? `${pathPrefix}.${key}` : key;
-            cachedProxy = createProxy(val, nextPrefix);
-            proxyCache.set(val, cachedProxy);
+          const nextPrefix = pathPrefix ? `${pathPrefix}.${key}` : key;
+
+          let cachedByPath = proxyCache.get(val);
+          if (!cachedByPath) {
+            cachedByPath = new Map<string, any>();
+            proxyCache.set(val, cachedByPath);
           }
+
+          let cachedProxy = cachedByPath.get(nextPrefix);
+          if (!cachedProxy) {
+            cachedProxy = createProxy(val, nextPrefix);
+            cachedByPath.set(nextPrefix, cachedProxy);
+          }
+
           return cachedProxy;
         }
         return val;

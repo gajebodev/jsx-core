@@ -1,4 +1,4 @@
-import { useMount, useUnmount } from "./lifecycle";
+import { __renderWithLifecycle, useMount } from "./lifecycle";
 
 type StatePatch<T> = T extends object ? Partial<T> | T : T;
 export type StateUpdater<T> = StatePatch<T> | ((prev: T) => StatePatch<T>);
@@ -90,22 +90,19 @@ export function createStore<T>(initial: T): Store<T> {
   return { getState, setState, subscribe };
 }
 
-// Declarative Fine-Grained JSX Text Binder
 export function $text<T>(store: Store<T>, select: (state: T) => unknown): Text {
-  // Create an initial native TextNode using the current slice of state
-  const textNode = document.createTextNode(String(select(store.getState())));
-  let unsubscribe: (() => void) | null = null;
+  return __renderWithLifecycle(() => {
+    const textNode = document.createTextNode(String(select(store.getState())));
+    useMount(() => {
+      const unsubscribe = store.subscribe((state) => {
+        textNode.textContent = String(select(state));
+      });
 
-  // Mount cleanups map seamlessly to your single-run mutation lifecycle tracking
-  useMount(() => {
-    unsubscribe = store.subscribe((state) => {
-      textNode.textContent = String(select(state));
+      return () => {
+        unsubscribe();
+      };
     });
-  });
 
-  useUnmount(() => {
-    if (unsubscribe) unsubscribe();
-  });
-
-  return textNode;
+    return textNode;
+  }) as Text;
 }
