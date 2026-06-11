@@ -11,7 +11,6 @@ Unlike traditional Virtual DOM frameworks (like React), components in this archi
 - 🚀 **Single-Execution Components**: Functions evaluate exactly once on setup. No re-rendering overhead.
 - 🧬 **Mutation-Driven Lifecycles**: `useMount` and `useUnmount` connect natively to browser insertions/removals via a background `MutationObserver`.
 - 🔄 **Deep Proxy Reactivity**: Track nested properties and index alterations cleanly using an optimized, cached `useReactive` proxy framework.
-- 🎛️ **Streamlined State Controllers**: Handle controlled/uncontrolled patterns with `useReactiveValue`.
 - 🧱 **Structural Control Components**: `Show`, `For`, and `ErrorBoundary` provide direct-to-DOM control flow without reconciliation.
 - 🧭 **Built-In Router and Store Utilities**: `createRouter`, `createStore`, and `$text` cover common SPA needs.
 
@@ -45,7 +44,6 @@ import {
   useUnmount,
   useReactive,
   useReactiveEffect,
-  useReactiveValue,
   createRouter,
   createStore,
   $text,
@@ -117,44 +115,7 @@ export function Counter() {
 }
 ```
 
-### 3. Controllable State Strategist (`useReactiveValue`)
-
-Abstract component wrapper APIs cleanly, allowing components to run under parent controlled states or fall back to internal tracking proxies seamlessly:
-
-```tsx
-import { useReactiveValue, useReactiveEffect } from "@gajebodev/jsx-core";
-
-interface ToggleProps {
-  value?: boolean;
-}
-
-export function ToggleSwitch(props: ToggleProps) {
-  // Streamlined options interface handles fallback configuration
-  const [state, setState] = useReactiveValue(props, {
-    defaultValue: false,
-    onChange: (newValue) => console.log("State shifted to:", newValue)
-  });
-
-  const btnRef = { current: null as HTMLButtonElement | null };
-
-  useReactiveEffect(
-    (isChecked) => {
-      if (btnRef.current) {
-        btnRef.current.textContent = isChecked ? "ACTIVE" : "DISABLED";
-      }
-    },
-    [state, "value"]
-  );
-
-  return (
-    <button ref={btnRef} onClick={() => setState((prev) => !prev)}>
-      Processing...
-    </button>
-  );
-}
-```
-
-### 4. Publisher Micro-Stores (`createStore` / `$text`)
+### 3. Publisher Micro-Stores (`createStore` / `$text`)
 
 For global pub/sub variables or declarative micro-stores, leverage high-performance structural publishers paired with inline child evaluation text nodes:
 
@@ -181,7 +142,7 @@ export function Sidebar() {
 }
 ```
 
-### 5. Conditional Structural Layouts (`<Show>`)
+### 4. Conditional Structural Layouts (`<Show>`)
 
 Toggle entire structural DOM trees layout branches on or off using active template containers:
 
@@ -219,7 +180,7 @@ export function AdminGuard() {
 
 `Show` expects `render` and optional `fallback` functions so it can lazily generate fresh content when conditions toggle.
 
-### 6. High-Performance Structural Loops (`<For>`)
+### 5. High-Performance Structural Loops (`<For>`)
 
 Render array structures with stable row DOM reuse for same-length updates, plus deterministic full resets when the list shape changes.
 
@@ -289,7 +250,7 @@ export function TodoApp() {
 
 `For` provides `(itemPath, index)` through `render`, where `itemPath` maps to the reactive row path (for example, `todos.0`, `todos.1`, ...).
 
-### 7. Error Isolation (`<ErrorBoundary>`)
+### 6. Error Isolation (`<ErrorBoundary>`)
 
 Catch synchronous render-time errors and switch to a fallback view:
 
