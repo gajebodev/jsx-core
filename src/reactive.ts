@@ -9,27 +9,47 @@ type IsAny<T> = 0 extends 1 & T ? true : false;
 type PathImpl<T, Key extends keyof T> =
   IsAny<T> extends true
     ? string
-    : Key extends string
-      ? T[Key] extends Record<string, any>
-        ? T[Key] extends Node
-          ? `${Key}`
-          : `${Key}` | `${Key}.${PathImpl<T[Key], keyof T[Key]>}`
-        : `${Key}`
-      : never;
+    : T extends readonly (infer U)[]
+      ? U extends Record<string, any>
+        ? U extends Node
+          ? `${number}`
+          : `${number}` | `${number}.${PathImpl<U, keyof U>}`
+        : `${number}`
+      : Key extends string | number
+        ? T[Key] extends Record<string, any>
+          ? T[Key] extends Node
+            ? `${Key}`
+            : `${Key}` | `${Key}.${PathImpl<T[Key], keyof T[Key]>}`
+          : `${Key}`
+        : never;
 
 export type Path<T> =
-  IsAny<T> extends true ? string : PathImpl<T, keyof T> | (keyof T & string);
+  IsAny<T> extends true
+    ? string
+    : T extends readonly (infer U)[]
+      ? U extends Record<string, any>
+        ? U extends Node
+          ? `${number}`
+          : `${number}` | `${number}.${Path<U>}`
+        : `${number}`
+      : PathImpl<T, keyof T> | (keyof T & string);
 
 export type PathValue<T, P extends string> =
   IsAny<T> extends true
     ? any
-    : P extends `${infer Key}.${infer Rest}`
-      ? Key extends keyof T
-        ? PathValue<T[Key], Rest>
-        : any
-      : P extends keyof T
-        ? T[P]
-        : any;
+    : T extends readonly (infer U)[]
+      ? P extends `${number}.${infer Rest}`
+        ? PathValue<U, Rest>
+        : P extends `${number}`
+          ? U
+          : any
+      : P extends `${infer Key}.${infer Rest}`
+        ? Key extends keyof T
+          ? PathValue<T[Key], Rest>
+          : any
+        : P extends keyof T
+          ? T[P]
+          : any;
 
 export type ReactiveStore<T extends Record<string, any>> = T & {
   $onChange: (cb: (path: string, newValue: any) => void) => () => void;
