@@ -57,13 +57,7 @@ const LIVE_PROPERTIES = new Set([
   "checked",
   "disabled",
   "muted",
-  "selected",
-  "readOnly",
-  "autoFocus",
-  "autoComplete",
-  "maxLength",
-  "minLength",
-  "tabIndex"
+  "selected"
 ]);
 
 function setProp(el: HTMLElement, key: string, value: unknown): void {
@@ -87,9 +81,7 @@ function setProp(el: HTMLElement, key: string, value: unknown): void {
 
   // Datasets (Object syntax style: dataset={{ id: 1 }})
   if (normalizedKey === "dataset" && value && typeof value === "object") {
-    for (const [dKey, dVal] of Object.entries(
-      value as Record<string, DatasetValue>
-    )) {
+    for (const [dKey, dVal] of Object.entries(value as Record<string, DatasetValue>)) {
       if (dVal === null || dVal === undefined) delete el.dataset[dKey];
       else el.dataset[dKey] = String(dVal);
     }
@@ -105,13 +97,14 @@ function setProp(el: HTMLElement, key: string, value: unknown): void {
     return;
   }
 
-  // Safe Event Handlers (Direct property replacement prevents event stacking leaks)
+  // Safe Event Handlers
   if (normalizedKey.startsWith("on") && normalizedKey.length > 2) {
     const eventName = normalizedKey.slice(2).toLowerCase();
     (el as any)[`on${eventName}`] = typeof value === "function" ? value : null;
     return;
   }
 
+  // Map normalized JS property names back to their standard HTML attribute matches
   const attrName =
     normalizedKey === "className"
       ? "class"
@@ -119,13 +112,11 @@ function setProp(el: HTMLElement, key: string, value: unknown): void {
         ? "for"
         : normalizedKey;
 
-  // Clean Falsy State Clearing (Wipes attributes from DOM when missing or false)
+  // Clean Falsy State Clearing
   if (value === false || value === null || value === undefined || value === "") {
     if (LIVE_PROPERTIES.has(normalizedKey) && normalizedKey in el) {
       if (normalizedKey === "value") (el as any)[normalizedKey] = "";
-      else if (normalizedKey !== "tabIndex" && normalizedKey !== "maxLength" && normalizedKey !== "minLength") {
-        (el as any)[normalizedKey] = false;
-      }
+      else (el as any)[normalizedKey] = false;
     }
     el.removeAttribute(attrName);
     return;
