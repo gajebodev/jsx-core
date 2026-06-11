@@ -43,21 +43,13 @@ export function appendChild(parent: Node, child: JSXChild): void {
 const DOM_PROP_MAP: Record<string, string> = {
   class: "className",
   classname: "className",
-  className: "className",
   htmlfor: "htmlFor",
-  htmlFor: "htmlFor",
   readonly: "readOnly",
-  readOnly: "readOnly",
   autofocus: "autoFocus",
-  autoFocus: "autoFocus",
   autocomplete: "autoComplete",
-  autoComplete: "autoComplete",
   maxlength: "maxLength",
-  maxLength: "maxLength",
   minlength: "minLength",
-  minLength: "minLength",
-  tabindex: "tabIndex",
-  tabIndex: "tabIndex"
+  tabindex: "tabIndex"
 };
 
 const LIVE_PROPERTIES = new Set([
@@ -77,7 +69,9 @@ const LIVE_PROPERTIES = new Set([
 function setProp(el: HTMLElement, key: string, value: unknown): void {
   // Normalize casing mismatches
   const lookupKey = key.toLowerCase();
-  const normalizedKey = DOM_PROP_MAP[key] || DOM_PROP_MAP[lookupKey] || key;
+  const normalizedKey = Object.prototype.hasOwnProperty.call(DOM_PROP_MAP, lookupKey)
+    ? DOM_PROP_MAP[lookupKey]
+    : key;
 
   // Inline Styles
   if (normalizedKey === "style") {

@@ -234,9 +234,12 @@ API:
 ```
 
 Behavior summary:
+
 - Reuses existing row DOM groups when only inner fields change.
 - Fully rebuilds rows when array length changes.
 - Can also fully rebuild rows when `version` changes (useful for explicit server payload replacement).
+
+> ⚠️ **Note**: If you reorder items without changing length, bump `version` to force a rebuild (bindings are index/path-based).
 
 ```tsx
 import { useReactive, useReactiveEffect } from "@gajebodev/jsx-core";
