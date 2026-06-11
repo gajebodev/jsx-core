@@ -83,7 +83,7 @@ export function useReactive<T extends Record<string, any>>(
         if (typeof key === "symbol")
           return Reflect.set(target, key, value, receiver);
 
-        if (Reflect.get(target, key, receiver) === value)
+        if (Object.is(Reflect.get(target, key, receiver), value))
           return true;
 
         if (!Reflect.set(target, key, value, receiver))

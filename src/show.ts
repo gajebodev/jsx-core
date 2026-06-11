@@ -1,5 +1,6 @@
 import { type JSXChild, appendChild } from "./jsx-runtime";
 import { useReactiveEffect, ReactiveStore, Path } from "./reactive";
+import { useUnmount } from "./lifecycle";
 
 interface ShowProps<T extends Record<string, any>, P extends Path<T>> {
   when: [ReactiveStore<T>, P];
@@ -23,7 +24,7 @@ export function Show<T extends Record<string, any>, P extends Path<T>>({
     currentNodes = [];
   };
 
-  const appendContent = (renderFn: () => JSXChild, targetContainer: Node | DocumentFragment) => {
+  const appendContent = (renderFn: () => JSXChild, targetContainer: Node) => {
     const content = renderFn();
     if (content === undefined || content === null || typeof content === "boolean")
       return;
@@ -45,6 +46,10 @@ export function Show<T extends Record<string, any>, P extends Path<T>>({
       appendContent(fallback, anchor.parentNode);
     }
   }, when);
+
+  useUnmount(() => {
+    clearCurrentNodes();
+  });
 
   return fragment;
 }

@@ -1,5 +1,6 @@
 import { type JSXChild, appendChild } from "./jsx-runtime";
 import { useReactiveEffect, ReactiveStore, Path } from "./reactive";
+import { useUnmount } from "./lifecycle";
 
 interface ForProps<T extends Record<string, any>, P extends Path<T>> {
   each: [ReactiveStore<T>, P];
@@ -20,6 +21,13 @@ export function For<T extends Record<string, any>, P extends Path<T>>({
   let lastVersion = version;
   const [, targetPath] = each;
 
+  const clearRenderedNodes = () => {
+    for (const group of renderedNodes) {
+      for (const node of group) node.parentNode?.removeChild(node);
+    }
+    renderedNodes = [];
+  };
+
   useReactiveEffect((currentArray: any) => {
     if (!anchor.parentNode) return;
 
@@ -31,14 +39,7 @@ export function For<T extends Record<string, any>, P extends Path<T>>({
     // - The list size physically changed (pagination, truncation, standard add/delete)
     // - OR the version prop shifted (explicit fresh payload replacement from the server)
     const versionShifted = version !== lastVersion;
-    if (listLen !== renderedLen || versionShifted) {
-      for (const group of renderedNodes) {
-        for (const node of group) {
-          node.parentNode?.removeChild(node);
-        }
-      }
-      renderedNodes = [];
-    }
+    if (listLen !== renderedLen || versionShifted) clearRenderedNodes();
 
     const nextNodes: Node[][] = [];
     let insertBeforeTarget: Node | null = anchor.nextSibling;
@@ -74,6 +75,10 @@ export function For<T extends Record<string, any>, P extends Path<T>>({
     renderedNodes = nextNodes;
     lastVersion = version;
   }, each);
+
+  useUnmount(() => {
+    clearRenderedNodes();
+  });
 
   return fragment;
 }

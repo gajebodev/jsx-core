@@ -1,4 +1,5 @@
 import { type JSXChild, appendChild } from "./jsx-runtime";
+import { useUnmount } from "./lifecycle";
 
 export interface ErrorBoundaryProps {
   render: () => JSXChild;
@@ -39,6 +40,10 @@ export function ErrorBoundary(props: ErrorBoundaryProps): Node {
       appendContent(props.fallback(error), container);
     }
   }
+
+  useUnmount(() => {
+    clearCurrentNodes();
+  });
 
   return fragment;
 }
