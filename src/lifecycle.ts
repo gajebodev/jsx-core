@@ -49,15 +49,13 @@ function processDomChanges(nodes: NodeList, isConnecting: boolean) {
       if (isConnecting) {
         fireMount(entry);
       } else {
-        entry.targets.delete(node);
-
         queueMicrotask(() => {
           // Rescue if the node was reparented synchronously
           if (node.isConnected) {
-            entry.targets.add(node);
             return;
           }
 
+          entry.targets.delete(node);
           delete (node as TrackedNode).__lifecycle_entry__;
 
           // If the set is empty OR nothing is left connected, it's safe to unmount
