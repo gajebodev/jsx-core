@@ -82,7 +82,8 @@ export function useReactive<T extends Record<string, any>>(
         }
 
         const val = Reflect.get(target, key, receiver);
-        if (val && typeof val === "object" && !(val instanceof Node)) {
+        const isDomNode = typeof Node !== "undefined" && val instanceof Node;
+        if (val && typeof val === "object" && !isDomNode) {
           const nextPrefix = pathPrefix ? `${pathPrefix}.${key}` : key;
 
           let cachedByPath = proxyCache.get(val);
