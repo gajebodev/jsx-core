@@ -122,7 +122,10 @@ function setProp(el: HTMLElement, key: string, value: unknown): void {
   // Clean Falsy State Clearing (Wipes attributes from DOM when missing or false)
   if (value === false || value === null || value === undefined || value === "") {
     if (LIVE_PROPERTIES.has(normalizedKey) && normalizedKey in el) {
-      (el as any)[normalizedKey] = normalizedKey === "value" ? "" : false;
+      if (normalizedKey === "value") (el as any)[normalizedKey] = "";
+      else if (normalizedKey !== "tabIndex" && normalizedKey !== "maxLength" && normalizedKey !== "minLength") {
+        (el as any)[normalizedKey] = false;
+      }
     }
     el.removeAttribute(attrName);
     return;

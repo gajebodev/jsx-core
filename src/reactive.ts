@@ -38,6 +38,7 @@ export type ReactiveStore<T extends Record<string, any>> = T & {
 // ============================================================================
 // USE_REACTIVE (OPTIMIZED DEEP STATE PROXY FACTORY)
 // ============================================================================
+const RAW_TARGET = Symbol("RAW_TARGET");
 
 export function useReactive<T extends Record<string, any>>(
   initialObj: T
@@ -48,9 +49,10 @@ export function useReactive<T extends Record<string, any>>(
   function createProxy(obj: any, pathPrefix = ""): any {
     return new Proxy(obj, {
       get(target, key: string | symbol, receiver) {
-        if (typeof key === "symbol") {
+        if (key === RAW_TARGET) return target;
+
+        if (typeof key === "symbol")
           return Reflect.get(target, key, receiver);
-        }
 
         if (key === "$onChange" && pathPrefix === "") {
           return (cb: (path: string, newValue: any) => void) => {
@@ -74,7 +76,6 @@ export function useReactive<T extends Record<string, any>>(
             cachedProxy = createProxy(val, nextPrefix);
             cachedByPath.set(nextPrefix, cachedProxy);
           }
-
           return cachedProxy;
         }
         return val;
@@ -83,14 +84,13 @@ export function useReactive<T extends Record<string, any>>(
         if (typeof key === "symbol")
           return Reflect.set(target, key, value, receiver);
 
-        if (Object.is(Reflect.get(target, key, receiver), value))
-          return true;
+        const rawValue = (value && value[RAW_TARGET]) ? value[RAW_TARGET] : value;
 
-        if (!Reflect.set(target, key, value, receiver))
-          return false;
+        if (Object.is(Reflect.get(target, key, receiver), rawValue)) return true;
+        if (!Reflect.set(target, key, rawValue, receiver)) return false;
 
         const currentPath = pathPrefix ? `${pathPrefix}.${key}` : key;
-        listeners.forEach((callback) => callback(currentPath, value));
+        listeners.forEach((callback) => callback(currentPath, rawValue));
         return true;
       }
     });
