@@ -10,9 +10,5 @@ export function jsxDEV(
   _source?: unknown,
   _self?: unknown
 ): Node {
-  return jsx(
-    type as ElementType,
-    (props ?? {}) as Record<string, unknown>,
-    key
-  );
+  return jsx(type as ElementType, (props ?? {}) as Record<string, unknown>, key);
 }

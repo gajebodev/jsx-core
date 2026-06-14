@@ -19,10 +19,6 @@
       "types": "./dist/for.d.ts",
       "import": "./dist/for.js"
     },
-    "./show": {
-      "types": "./dist/show.d.ts",
-      "import": "./dist/show.js"
-    },
     "./error": {
       "types": "./dist/error.d.ts",
       "import": "./dist/error.js"

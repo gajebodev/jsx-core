@@ -20,8 +20,7 @@ export function ErrorBoundary(props: ErrorBoundaryProps): Node {
   };
 
   const appendContent = (content: JSXChild, targetContainer: Node | DocumentFragment) => {
-    if (content === undefined || content === null || typeof content === "boolean")
-      return;
+    if (content === undefined || content === null || typeof content === "boolean") return;
 
     const tempContainer = document.createDocumentFragment();
     appendChild(tempContainer, content);

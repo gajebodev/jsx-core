@@ -9,8 +9,8 @@ export type { JSXChild, ElementType } from "./jsx-runtime";
 export { useMount, useUnmount } from "./lifecycle";
 
 // Reactive
-export { useReactive, useReactiveEffect, useReactiveValue } from "./reactive";
-export type { ReactiveStore } from "./reactive";
+export { useReactive, useReactiveEffect, getReactiveValue, $reactive } from "./reactive";
+export type { ReactiveStore, ReactiveProp } from "./reactive";
 
 // Router
 export { createRouter } from "./router";

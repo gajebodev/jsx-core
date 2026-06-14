@@ -11,9 +11,9 @@ Unlike traditional Virtual DOM frameworks (like React), components in this archi
 - 🚀 **Single-Execution Components**: Functions evaluate exactly once on setup. No re-rendering overhead.
 - 🧬 **Mutation-Driven Lifecycles**: `useMount` and `useUnmount` connect natively to browser insertions/removals via a background `MutationObserver`.
 - 🔄 **Deep Proxy Reactivity**: Track nested properties and index alterations cleanly using an optimized, cached `useReactive` proxy framework.
-- 🎛️ **Streamlined State Controllers**: Handle controlled/uncontrolled patterns with `useReactiveValue`.
 - 🧱 **Structural Control Components**: `Show`, `For`, and `ErrorBoundary` provide direct-to-DOM control flow without reconciliation.
 - 🧭 **Built-In Router and Store Utilities**: `createRouter`, `createStore`, and `$text` cover common SPA needs.
+- 🎨 **Lightweight Utilities**: `cx` for conditional class binding, Fragment support, and ref callbacks.
 
 ## Installation
 
@@ -45,11 +45,23 @@ import {
   useUnmount,
   useReactive,
   useReactiveEffect,
-  useReactiveValue,
+  getReactiveValue,
+  $reactive,
   createRouter,
   createStore,
   $text,
   cx
+} from "@gajebodev/jsx-core";
+
+// Type exports
+import type {
+  JSXChild,
+  ElementType,
+  ReactiveStore,
+  ReactiveProp,
+  Store,
+  RouteContext,
+  RouteConfig
 } from "@gajebodev/jsx-core";
 ```
 
@@ -59,13 +71,65 @@ import {
 import { For } from "@gajebodev/jsx-core/for";
 import { Show } from "@gajebodev/jsx-core/show";
 import { ErrorBoundary } from "@gajebodev/jsx-core/error";
+import { jsx as jsxDEV } from "@gajebodev/jsx-core/jsx-dev-runtime";
 ```
 
 ## Core Ecosystem Guides
 
-### 1. Component Lifecycles (`useMount` / `useUnmount`)
+### Fragment Support
 
-Because elements are inserted dynamically without framework reconciliation passes, lifecycles hook straight into real DOM tree status modifications:
+Use `Fragment` to group multiple elements without adding a wrapper DOM node:
+
+```tsx
+import { Fragment } from "@gajebodev/jsx-core";
+
+export function Item() {
+  return (
+    <Fragment>
+      <h2>Title</h2>
+      <p>Description</p>
+    </Fragment>
+
+    // Short Syntax
+    <>Footer</>
+  );
+}
+```
+
+### Ref Callbacks and Objects
+
+Both callback refs and ref objects are supported:
+
+```tsx
+// Callback ref
+const inputRef = (el: HTMLInputElement) => {
+  console.log("Input mounted:", el);
+};
+
+// Ref object
+const buttonRef = { current: null as HTMLButtonElement | null };
+
+export function Form() {
+  return (
+    <>
+      <input ref={inputRef} />
+      <button ref={buttonRef}>Click me</button>
+    </>
+  );
+}
+```
+
+### Datasets and Attributes
+
+```tsx
+<div data-testid="main" aria-label="Main content" dataset={{ userId: 123, role: "admin" }}>
+  Content
+</div>
+```
+
+### Component Lifecycles (`useMount` / `useUnmount`)
+
+Because elements are inserted dynamically without framework reconciliation passes, lifecycles hook straight into real DOM tree status modifications via a background `MutationObserver`:
 
 ```tsx
 import { useMount, useUnmount } from "@gajebodev/jsx-core";
@@ -73,19 +137,37 @@ import { useMount, useUnmount } from "@gajebodev/jsx-core";
 export function ProfileBadge() {
   useMount(() => {
     console.log("Component node added to the live DOM tree");
+
+    // Lifecycle cleanup is optional—return a function for unmount
+    return () => {
+      console.log("Cleanup on unmount");
+    };
   });
 
   useUnmount(() => {
-    console.log("Component node scrubbed from document layout");
+    console.log("Component node removed from document layout");
   });
 
   return <section class="badge">Profile Ready</section>;
 }
 ```
 
-### 2. Fine-Grained Reactive Proxies (`useReactive` / `useReactiveEffect`)
+**Key Points for Callbacks:**
 
-Manage deep-state data tracking using paths. Bind changes to specific element references to alter text or attributes without re-running the component function:
+- Callbacks in both `useReactiveEffect` and `$reactive` receive dependency values as **spread arguments**
+- Single dependency: `callback(value)`
+- Multiple dependencies: `callback(value1, value2, ...)`
+
+**Key Points:**
+
+- `useMount` fires once when the element is inserted into the live DOM tree
+- `useMount` callback can optionally return a cleanup function that fires on unmount
+- `useUnmount` fires when the element is removed from the document
+- Unlike React, these are tied to actual DOM mutations, not reconciliation phases
+
+### Fine-Grained Reactive Proxies (`useReactive` / `useReactiveEffect`)
+
+Manage deep-state data tracking using paths. Bind changes to specific element references to alter text or attributes without re-running the component function. The callback receives **spread dependency values** as arguments:
 
 ```tsx
 import { useReactive, useReactiveEffect } from "@gajebodev/jsx-core";
@@ -98,7 +180,7 @@ export function Counter() {
 
   const textRef = { current: null as HTMLElement | null };
 
-  // 2. Explicit side-effect target updates point to a specific string path
+  // 2. Callback receives the resolved dependency value(s) as spread arguments
   useReactiveEffect(
     (nextCount) => {
       if (textRef.current) {
@@ -117,44 +199,64 @@ export function Counter() {
 }
 ```
 
-### 3. Controllable State Strategist (`useReactiveValue`)
+**Key Points:**
 
-Abstract component wrapper APIs cleanly, allowing components to run under parent controlled states or fall back to internal tracking proxies seamlessly:
+- Callbacks receive dependency values as **spread arguments**: `(value)` for single, `(value1, value2, ...)` for multiple
+- Single dependency example: `useReactiveEffect((count) => {...}, [state, "metrics.count"])`
+- Multiple dependency example: `useReactiveEffect((price, tax) => {...}, [[state, "price"], [state, "tax"]])`
+
+### Reactive Computed Bindings (`$reactive`)
+
+Define computed values that automatically update when their dependencies change. These bindings are detected and handled **automatically** when used as JSX props or children:
 
 ```tsx
-import { useReactiveValue, useReactiveEffect } from "@gajebodev/jsx-core";
+import { useReactive, $reactive } from "@gajebodev/jsx-core";
 
-interface ToggleProps {
-  value?: boolean;
-}
-
-export function ToggleSwitch(props: ToggleProps) {
-  // Streamlined options interface handles fallback configuration
-  const [state, setState] = useReactiveValue(props, {
-    defaultValue: false,
-    onChange: (newValue) => console.log("State shifted to:", newValue)
+export function PriceCalculator() {
+  const state = useReactive({
+    price: 100,
+    tax: 0.1
   });
 
-  const btnRef = { current: null as HTMLButtonElement | null };
-
-  useReactiveEffect(
-    (isChecked) => {
-      if (btnRef.current) {
-        btnRef.current.textContent = isChecked ? "ACTIVE" : "DISABLED";
-      }
-    },
-    [state, "value"]
-  );
-
   return (
-    <button ref={btnRef} onClick={() => setState((prev) => !prev)}>
-      Processing...
-    </button>
+    <div class="calculator">
+      {/* Reactive computed binding as child — updates automatically */}
+      <span>
+        Total:{" "}
+        {$reactive(
+          (price, tax) => `$${(price * (1 + tax)).toFixed(2)}`,
+          [state, "price"],
+          [state, "tax"]
+        )}
+      </span>
+
+      {/* Reactive computed binding as prop — updates automatically */}
+      <div
+        class={$reactive(
+          (price) => {
+            return price > 150 ? "expensive" : "affordable";
+          },
+          [state, "price"]
+        )}
+      >
+        Price tier indicator
+      </div>
+
+      <button onClick={() => (state.price += 10)}>Add $10</button>
+    </div>
   );
 }
 ```
 
-### 4. Publisher Micro-Stores (`createStore` / `$text`)
+**Key Points:**
+
+- `$reactive` creates a computed binding that is **automatically detected and updated** in props and children
+- The compute function receives unwrapped dependency values as **spread arguments**
+- Pass dependencies as separate arguments: `$reactive(computeFn, [store, "path1"], [store, "path2"], ...)`
+- The binding will re-compute and update the DOM whenever any dependency changes
+- No manual `useReactiveEffect` wrapper needed—it's handled transparently by the runtime
+
+### Publisher Micro-Stores (`createStore` / `$text`)
 
 For global pub/sub variables or declarative micro-stores, leverage high-performance structural publishers paired with inline child evaluation text nodes:
 
@@ -172,54 +274,15 @@ export function Sidebar() {
     <aside class="panel">
       {/* Declarative Text Node Binder updates natively, skipping component reruns */}
       <h3>Welcome, {$text(configStore, (s) => s.user)}</h3>
-
-      <button onClick={() => configStore.setState({ user: "Admin" })}>
-        Elevate Permissions
-      </button>
+      <button onClick={() => configStore.setState({ user: "Admin" })}>Elevate Permissions</button>
     </aside>
   );
 }
 ```
 
-### 5. Conditional Structural Layouts (`<Show>`)
+## Optional Framework Components
 
-Toggle entire structural DOM trees layout branches on or off using active template containers:
-
-```tsx
-import { useReactive } from "@gajebodev/jsx-core";
-import { Show } from "@gajebodev/jsx-core/show";
-
-export function AdminGuard() {
-  const session = useReactive({ user: { isAuthorized: false } });
-
-  return (
-    <main class="viewport">
-      <button
-        onClick={() => (session.user.isAuthorized = !session.user.isAuthorized)}
-      >
-        Toggle Authorization
-      </button>
-
-      {/* Conditionally attaches or detaches nodes from the live DOM tree */}
-      <Show
-        when={[session, "user.isAuthorized"]}
-        render={() => (
-          <div class="secure-panel">
-            <h2>🔒 Administrative Dashboard</h2>
-          </div>
-        )}
-        fallback={() => (
-          <p class="error">⛔ Access Denied. Authorization Required.</p>
-        )}
-      />
-    </main>
-  );
-}
-```
-
-`Show` expects `render` and optional `fallback` functions so it can lazily generate fresh content when conditions toggle.
-
-### 6. High-Performance Structural Loops (`<For>`)
+### High-Performance Structural Loops (`<For>`)
 
 Render array structures with stable row DOM reuse for same-length updates, plus deterministic full resets when the list shape changes.
 
@@ -270,9 +333,7 @@ export function TodoApp() {
 
   return (
     <div class="box">
-      <button
-        onClick={() => store.todos.push({ id: Date.now(), text: "New Task" })}
-      >
+      <button onClick={() => store.todos.push({ id: Date.now(), text: "New Task" })}>
         Add Task
       </button>
 
@@ -289,7 +350,7 @@ export function TodoApp() {
 
 `For` provides `(itemPath, index)` through `render`, where `itemPath` maps to the reactive row path (for example, `todos.0`, `todos.1`, ...).
 
-### 7. Error Isolation (`<ErrorBoundary>`)
+### Error Isolation (`<ErrorBoundary>`)
 
 Catch synchronous render-time errors and switch to a fallback view:
 
@@ -304,9 +365,7 @@ export function Dashboard() {
   return (
     <ErrorBoundary
       render={() => <CrashingWidget />}
-      fallback={(error) => (
-        <section class="error-box">Failed to render: {error.message}</section>
-      )}
+      fallback={(error) => <section class="error-box">Failed to render: {error.message}</section>}
     />
   );
 }
@@ -338,6 +397,16 @@ const router = createRouter([
   }
 });
 
+// Mount router to a DOM element
+router.mount(document.getElementById('root')!);
+
+// Programmatic navigation
+router.navigate('/item/123');
+
+// Refresh current route
+router.refresh();
+
+// Mount router to a DOM element and attaches click handlers for `<a data-link>` elements and popstate listeners
 router.mount(document.getElementById('root')!);
 ```
 
@@ -346,11 +415,7 @@ router.mount(document.getElementById('root')!);
 ```typescript
 import { cx } from "@gajebodev/jsx-core";
 
-const alertStyles = cx(
-  "alert-toast",
-  isUrgent && "theme-danger",
-  hasTransitioned && "motion-fade"
-);
+const alertStyles = cx("alert-toast", isUrgent && "theme-danger", hasTransitioned && "motion-fade");
 ```
 
 ## License

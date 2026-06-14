@@ -17,11 +17,7 @@ export interface RouteConfig<TData = unknown> {
 
 interface RouterOptions {
   notFound: () => Node;
-  onRouteChange?: (state: {
-    loading: boolean;
-    path: string;
-    name?: string;
-  }) => void;
+  onRouteChange?: (state: { loading: boolean; path: string; name?: string }) => void;
 }
 
 function parseParams(template: string, actual: string): Params | null {
@@ -52,10 +48,7 @@ function parseParams(template: string, actual: string): Params | null {
   return params;
 }
 
-export function createRouter(
-  routes: RouteConfig<any>[],
-  options: RouterOptions
-) {
+export function createRouter(routes: RouteConfig<any>[], options: RouterOptions) {
   let outlet: HTMLElement | null = null;
 
   const findRoute = (path: string) => {
@@ -88,9 +81,7 @@ export function createRouter(
       name: route.name
     });
 
-    const data = route.loader
-      ? await route.loader({ params, path })
-      : undefined;
+    const data = route.loader ? await route.loader({ params, path }) : undefined;
     const module = await route.component();
     const view = await module.default({ params, path, data });
 

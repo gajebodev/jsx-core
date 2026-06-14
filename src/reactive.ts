@@ -1,7 +1,7 @@
 import { useMount, useUnmount } from "./lifecycle";
 
 // ============================================================================
-// ADVANCED TYPESCRIPT PATH INFERENCE HELPERS (WITH ANY SHIELD)
+// ADVANCED TYPESCRIPT PATH INFERENCE HELPERS (WITH ARRAY SUPPORT)
 // ============================================================================
 
 type IsAny<T> = 0 extends 1 & T ? true : false;
@@ -52,46 +52,94 @@ export type PathValue<T, P extends string> =
           : any;
 
 export type ReactiveStore<T extends Record<string, any>> = T & {
-  $onChange: (cb: (path: string, newValue: any) => void) => () => void;
+  $onChange: (cb: (paths: string[]) => void) => () => void;
+};
+
+export type ReactiveProp<V> = V | [ReactiveStore<any>, string];
+
+type UnwrapDependency<Dep> = Dep extends [ReactiveStore<infer T>, infer P]
+  ? P extends string
+    ? PathValue<T, P>
+    : Dep
+  : Dep;
+
+type DependencyValues<Deps extends readonly any[]> = {
+  [K in keyof Deps]: UnwrapDependency<Deps[K]>;
 };
 
 // ============================================================================
-// USE_REACTIVE (OPTIMIZED DEEP STATE PROXY FACTORY)
+// DYNAMIC INLINE JSX REACTIVE PROP BINDERS
 // ============================================================================
+
+export const REACTIVE_MARKER = Symbol("REACTIVE_MARKER");
+
+export interface ReactiveBinding<V> {
+  [REACTIVE_MARKER]: true;
+  deps: readonly any[];
+  compute: (...args: any[]) => V;
+}
+
+export function isReactiveBinding(value: any): value is ReactiveBinding<any> {
+  return value && typeof value === "object" && value[REACTIVE_MARKER] === true;
+}
+
+export function $reactive<const Deps extends readonly any[], V>(
+  compute: (...values: DependencyValues<Deps>) => V,
+  dependencies: Deps
+): ReactiveBinding<V> {
+  return {
+    [REACTIVE_MARKER]: true,
+    deps: dependencies,
+    compute
+  };
+}
+
+// ============================================================================
+// USE_REACTIVE (OPTIMIZED DEEP STATE PROXY FACTORY WITH BATCHED CHANGELOG)
+// ============================================================================
+
 const RAW_TARGET = Symbol("RAW_TARGET");
 
-export function useReactive<T extends Record<string, any>>(
-  initialObj: T
-): ReactiveStore<T> {
-  const listeners = new Set<(path: string, newValue: any) => void>();
+export function useReactive<T extends Record<string, any>>(initialObj: T): ReactiveStore<T> {
+  const listeners = new Set<(paths: string[]) => void>();
   const proxyCache = new WeakMap<object, Map<string, any>>();
+  const isNodeDefined = typeof Node !== "undefined";
+
+  let isPending = false;
+  const changedPathsQueue = new Set<string>();
+
+  function triggerListeners() {
+    if (changedPathsQueue.size === 0) return;
+
+    const pathsArray = Array.from(changedPathsQueue);
+    changedPathsQueue.clear();
+
+    listeners.forEach((callback) => callback(pathsArray));
+  }
 
   function createProxy(obj: any, pathPrefix = ""): any {
     return new Proxy(obj, {
       get(target, key: string | symbol, receiver) {
         if (key === RAW_TARGET) return target;
-
-        if (typeof key === "symbol")
-          return Reflect.get(target, key, receiver);
+        if (typeof key === "symbol") return Reflect.get(target, key, receiver);
 
         if (key === "$onChange" && pathPrefix === "") {
-          return (cb: (path: string, newValue: any) => void) => {
+          return (cb: (paths: string[]) => void) => {
             listeners.add(cb);
             return () => listeners.delete(cb);
           };
         }
 
         const val = Reflect.get(target, key, receiver);
-        const isDomNode = typeof Node !== "undefined" && val instanceof Node;
+        const isDomNode = isNodeDefined && val instanceof Node;
+
         if (val && typeof val === "object" && !isDomNode) {
           const nextPrefix = pathPrefix ? `${pathPrefix}.${key}` : key;
-
           let cachedByPath = proxyCache.get(val);
           if (!cachedByPath) {
             cachedByPath = new Map<string, any>();
             proxyCache.set(val, cachedByPath);
           }
-
           let cachedProxy = cachedByPath.get(nextPrefix);
           if (!cachedProxy) {
             cachedProxy = createProxy(val, nextPrefix);
@@ -102,16 +150,22 @@ export function useReactive<T extends Record<string, any>>(
         return val;
       },
       set(target, key: string | symbol, value, receiver) {
-        if (typeof key === "symbol")
-          return Reflect.set(target, key, value, receiver);
+        if (typeof key === "symbol") return Reflect.set(target, key, value, receiver);
 
-        const rawValue = (value && value[RAW_TARGET]) ? value[RAW_TARGET] : value;
-
+        const rawValue = value && value[RAW_TARGET] ? value[RAW_TARGET] : value;
         if (Object.is(Reflect.get(target, key, receiver), rawValue)) return true;
         if (!Reflect.set(target, key, rawValue, receiver)) return false;
 
         const currentPath = pathPrefix ? `${pathPrefix}.${key}` : key;
-        listeners.forEach((callback) => callback(currentPath, rawValue));
+        changedPathsQueue.add(currentPath);
+
+        if (!isPending) {
+          isPending = true;
+          queueMicrotask(() => {
+            isPending = false;
+            triggerListeners();
+          });
+        }
         return true;
       }
     });
@@ -134,98 +188,80 @@ function getDeepValue(obj: any, segments: string[]): any {
   return current;
 }
 
-export function useReactiveEffect<
-  T extends Record<string, any>,
-  P extends Path<T>
->(
-  callback: (newValue: PathValue<T, P>) => void,
-  [reactiveObj, targetPath]: [ReactiveStore<T>, P]
-): void {
-  const pathSegments = targetPath.split(".");
+function isReactiveTuple(dep: any): dep is [store: ReactiveStore<any>, path: string] {
+  return (
+    Array.isArray(dep) &&
+    dep.length === 2 &&
+    typeof dep[0] === "object" &&
+    dep[0] !== null &&
+    typeof dep[0].$onChange === "function" &&
+    typeof dep[1] === "string"
+  );
+}
 
-  let unsubscribe: (() => void) | null = null;
+export function getReactiveValue<V>(prop: ReactiveProp<V>): V {
+  if (isReactiveTuple(prop)) {
+    const [store, path] = prop;
+    return getDeepValue(store, path.split(".")) as V;
+  }
+  return prop as V;
+}
+
+// OVERLOAD 1: Single Reactive Store Dependency Tuple
+export function useReactiveEffect<T extends Record<string, any>, P extends Path<T>>(
+  callback: (value: PathValue<T, P>) => void,
+  dependency: readonly [ReactiveStore<T>, P]
+): void;
+
+// OVERLOAD 2: Multi ReactiveProps Tuple
+export function useReactiveEffect<const Deps extends readonly any[]>(
+  callback: (...values: DependencyValues<Deps>) => void,
+  dependencies: Deps
+): void;
+
+// CORE IMPLEMENTATION
+export function useReactiveEffect(
+  callback: (...values: any[]) => void,
+  depsOrDep: readonly any[]
+): void {
+  const isMulti = Array.isArray(depsOrDep) && !isReactiveTuple(depsOrDep);
+  const dependencies: readonly any[] = isMulti ? depsOrDep : [depsOrDep];
+
+  const getAllCurrentValues = () => {
+    const values = dependencies.map((dep) => getReactiveValue(dep));
+    return values;
+  };
+
+  const unsubscribes: (() => void)[] = [];
 
   useMount(() => {
-    callback(getDeepValue(reactiveObj, pathSegments));
+    callback(...getAllCurrentValues());
 
-    unsubscribe = reactiveObj.$onChange((changedPath: string) => {
-      // Case A: The exact target path changed
-      if (changedPath === targetPath) {
-        callback(getDeepValue(reactiveObj, pathSegments));
-        return;
-      }
+    dependencies.forEach((dep) => {
+      if (!isReactiveTuple(dep)) return;
 
-      // Case B: A structural parent object was completely overwritten
-      if (
-        targetPath.length > changedPath.length &&
-        targetPath.startsWith(changedPath + ".")
-      ) {
-        callback(getDeepValue(reactiveObj, pathSegments));
-        return;
-      }
+      const [reactiveObj, targetPath] = dep;
+      const unsubscribe = reactiveObj.$onChange((changedPaths: string[]) => {
+        const hasMatchingChange = changedPaths.some((changedPath) => {
+          const isExactMatch = changedPath === targetPath;
+          const isParentOverwritten =
+            targetPath.length > changedPath.length && targetPath.startsWith(changedPath + ".");
+          const isChildMutated =
+            changedPath.length > targetPath.length && changedPath.startsWith(targetPath + ".");
 
-      // Case C: An internal item property deep inside an array or object shifted
-      if (
-        changedPath.length > targetPath.length &&
-        changedPath.startsWith(targetPath + ".")
-      ) {
-        callback(getDeepValue(reactiveObj, pathSegments));
-      }
+          return isExactMatch || isParentOverwritten || isChildMutated;
+        });
+
+        if (hasMatchingChange) {
+          callback(...getAllCurrentValues());
+        }
+      });
+
+      unsubscribes.push(unsubscribe);
     });
   });
 
   useUnmount(() => {
-    if (unsubscribe) {
-      unsubscribe();
-    }
+    unsubscribes.forEach((unsub) => unsub());
   });
-}
-
-// ============================================================================
-// USE_REACTIVE_VALUE (STREAMLINED CONTROLLABLE STATE STRATEGIST)
-// ============================================================================
-
-interface StandardControllableProps<T> {
-  value?: T;
-  [key: string]: any;
-}
-
-interface ControllableOptions<T> {
-  defaultValue?: T;
-  onChange?: (newValue: T) => void;
-}
-
-export function useReactiveValue<T>(
-  props: StandardControllableProps<T>,
-  options: ControllableOptions<T> = {}
-) {
-  const isControlled = "value" in props && props.value !== undefined;
-  const initialValue = isControlled ? props.value : options.defaultValue;
-  const state = useReactive({ value: initialValue });
-
-  if (isControlled && typeof (props as any).$onChange === "function") {
-    useReactiveEffect(
-      (newParentValue) => {
-        state.value = newParentValue;
-      },
-      [props as any, "value"]
-    );
-  }
-
-  const setState = (newValue: T | ((prev: T) => T)) => {
-    const resolvedValue =
-      typeof newValue === "function"
-        ? (newValue as (prev: T) => T)(state.value as T)
-        : newValue;
-
-    if (!isControlled) {
-      state.value = resolvedValue;
-    }
-
-    if (typeof options.onChange === "function") {
-      options.onChange(resolvedValue);
-    }
-  };
-
-  return [state, setState] as const;
 }

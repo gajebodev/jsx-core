@@ -75,7 +75,11 @@ function processDomChanges(nodes: NodeList, isConnecting: boolean) {
 }
 
 function ensureLifecycleObserver() {
-  if (lifecycleObserver || typeof document === "undefined" || typeof MutationObserver === "undefined")
+  if (
+    lifecycleObserver ||
+    typeof document === "undefined" ||
+    typeof MutationObserver === "undefined"
+  )
     return;
 
   const root = document.documentElement;
@@ -92,8 +96,7 @@ function ensureLifecycleObserver() {
 }
 
 function registerLifecycle(node: Node, collector: LifecycleCollector) {
-  if (collector.mountCallbacks.length === 0 && collector.unmountCallbacks.length === 0)
-    return;
+  if (collector.mountCallbacks.length === 0 && collector.unmountCallbacks.length === 0) return;
 
   // If a fragment is empty, append a silent comment anchor so we don't leak lifecycles
   if (node.nodeType === Node.DOCUMENT_FRAGMENT_NODE && node.childNodes.length === 0) {
@@ -136,14 +139,12 @@ function registerLifecycle(node: Node, collector: LifecycleCollector) {
 }
 
 export function useMount(callback: LifecycleMountCallback) {
-  if (!activeLifecycleCollector)
-    throw new Error("useMount must run inside a function component");
+  if (!activeLifecycleCollector) throw new Error("useMount must run inside a function component");
   activeLifecycleCollector.mountCallbacks.push(callback);
 }
 
 export function useUnmount(callback: LifecycleUnmountCallback) {
-  if (!activeLifecycleCollector)
-    throw new Error("useUnmount must run inside a function component");
+  if (!activeLifecycleCollector) throw new Error("useUnmount must run inside a function component");
   activeLifecycleCollector.unmountCallbacks.push(callback);
 }
 

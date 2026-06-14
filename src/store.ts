@@ -11,10 +11,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return Object.getPrototypeOf(value) === Object.prototype;
 }
 
-function shallowEqualObjects(
-  a: Record<string, unknown>,
-  b: Record<string, unknown>
-) {
+function shallowEqualObjects(a: Record<string, unknown>, b: Record<string, unknown>) {
   const aKeys = Object.keys(a);
   const bKeys = Object.keys(b);
 
@@ -23,10 +20,7 @@ function shallowEqualObjects(
   }
 
   for (const key of aKeys) {
-    if (
-      !Object.prototype.hasOwnProperty.call(b, key) ||
-      !Object.is(a[key], b[key])
-    ) {
+    if (!Object.prototype.hasOwnProperty.call(b, key) || !Object.is(a[key], b[key])) {
       return false;
     }
   }
@@ -59,9 +53,7 @@ export function createStore<T>(initial: T): Store<T> {
   const setState = (patch: StateUpdater<T>) => {
     const previous = state;
     const nextPatch =
-      typeof patch === "function"
-        ? (patch as (prev: T) => StatePatch<T>)(previous)
-        : patch;
+      typeof patch === "function" ? (patch as (prev: T) => StatePatch<T>)(previous) : patch;
     const nextState = resolveNextState(previous, nextPatch);
 
     // Skip updates if reference hasn't shifted
