@@ -236,11 +236,6 @@ function createNode(type: ElementType, props: Props, key?: unknown): Node {
     setProp(el as HTMLElement, propKey, value);
   }
 
-  // Explicitly bind compiler-extracted keys as native element attributes
-  if (key !== undefined) {
-    setProp(el as HTMLElement, "key", key);
-  }
-
   if (props.children !== undefined) {
     appendChild(el, props.children);
   }

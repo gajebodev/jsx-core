@@ -253,7 +253,7 @@ export function PriceCalculator() {
 
 - `$reactive` creates a computed binding that is **automatically detected and updated** in props and children
 - The compute function receives unwrapped dependency values as **spread arguments**
-- Pass dependencies as separate arguments: `$reactive(computeFn, [store, "path1"], [store, "path2"], ...)`
+- Pass dependencies as separate arguments: `$reactive(computeFn, [[store, "path1"], [store, "path2"], ...])`
 - The binding will re-compute and update the DOM whenever any dependency changes
 - No manual `useReactiveEffect` wrapper needed—it's handled transparently by the runtime
 
@@ -398,7 +398,7 @@ const router = createRouter([
   }
 });
 
-// Mount router to a DOM element
+// Mount router to a DOM element and attaches click handlers for `<a data-link>` elements and popstate listeners
 router.mount(document.getElementById('root')!);
 
 // Programmatic navigation
@@ -406,9 +406,6 @@ router.navigate('/item/123');
 
 // Refresh current route
 router.refresh();
-
-// Mount router to a DOM element and attaches click handlers for `<a data-link>` elements and popstate listeners
-router.mount(document.getElementById('root')!);
 ```
 
 ### Atomic Conditional Classes (`cx`)
