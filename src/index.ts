@@ -1,23 +1,24 @@
-// Component utilities
-export { useState, useMount, useUnmount } from "./hooks";
-export type { StateHook, StateRef, StateChangeHandler } from "./hooks";
-export { isPlainObject, shallowEqualObjects } from "./utils";
-export type { StatePatch } from "./utils";
+// JSX dev runtime
+export { jsxDEV } from "./jsx-dev-runtime";
+
+// JSX runtime
+export { jsx, appendChild, Fragment } from "./jsx-runtime";
+export type { JSXChild, ElementType } from "./jsx-runtime";
+
+// Lifecycle
+export { useMount, useUnmount } from "./lifecycle";
+
+// Reactive
+export { useReactive, useReactiveEffect, getReactiveValue, $reactive } from "./reactive";
+export type { ReactiveStore, ReactiveProp } from "./reactive";
 
 // Router
 export { createRouter } from "./router";
 export type { RouteContext, RouteConfig } from "./router";
 
 // Store
-export { createStore, bindStoreText } from "./store";
+export { createStore, $text } from "./store";
 export type { Store } from "./store";
 
 // Class name utility
 export { cx } from "./cx";
-
-// JSX runtime
-export { jsx, Fragment } from "./jsx-runtime";
-export type { JSXChild, ElementType } from "./jsx-runtime";
-
-// JSX dev runtime
-export { jsxDEV } from "./jsx-dev-runtime";

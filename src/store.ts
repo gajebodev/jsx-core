@@ -1,6 +1,42 @@
-import { StatePatch, StateUpdater, isPlainObject, resolveNextState, shallowEqualObjects } from "./utils";
+import { __renderWithLifecycle, useMount } from "./lifecycle";
 
+type StatePatch<T> = T extends object ? Partial<T> | T : T;
+export type StateUpdater<T> = StatePatch<T> | ((prev: T) => StatePatch<T>);
 type Listener<T> = (state: T) => void;
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  return Object.getPrototypeOf(value) === Object.prototype;
+}
+
+function shallowEqualObjects(a: Record<string, unknown>, b: Record<string, unknown>) {
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+
+  if (aKeys.length !== bKeys.length) {
+    return false;
+  }
+
+  for (const key of aKeys) {
+    if (!Object.prototype.hasOwnProperty.call(b, key) || !Object.is(a[key], b[key])) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function resolveNextState<T>(previous: T, patch: StatePatch<T>): T {
+  if (isPlainObject(previous) && isPlainObject(patch)) {
+    return {
+      ...(previous as Record<string, unknown>),
+      ...(patch as Record<string, unknown>)
+    } as T;
+  }
+  return patch as T;
+}
 
 export interface Store<T> {
   getState: () => T;
@@ -16,21 +52,25 @@ export function createStore<T>(initial: T): Store<T> {
 
   const setState = (patch: StateUpdater<T>) => {
     const previous = state;
-    const nextPatch = typeof patch === "function"
-      ? (patch as (prev: T) => StatePatch<T>)(previous)
-      : patch;
+    const nextPatch =
+      typeof patch === "function" ? (patch as (prev: T) => StatePatch<T>)(previous) : patch;
     const nextState = resolveNextState(previous, nextPatch);
 
+    // Skip updates if reference hasn't shifted
     if (Object.is(previous, nextState)) {
       return;
     }
 
-    if (isPlainObject(previous) && isPlainObject(nextState) && shallowEqualObjects(previous, nextState)) {
+    // Skip updates if object shapes have shallow structural match
+    if (
+      isPlainObject(previous) &&
+      isPlainObject(nextState) &&
+      shallowEqualObjects(previous, nextState)
+    ) {
       return;
     }
 
     state = nextState;
-
     listeners.forEach((listener) => listener(state));
   };
 
@@ -42,15 +82,19 @@ export function createStore<T>(initial: T): Store<T> {
   return { getState, setState, subscribe };
 }
 
-export function bindStoreText<T>(
-  store: Store<T>,
-  select: (state: T) => string,
-  target: HTMLElement
-) {
-  const render = () => {
-    target.textContent = select(store.getState());
-  };
+export function $text<T>(store: Store<T>, select: (state: T) => unknown): Text {
+  return __renderWithLifecycle(() => {
+    const textNode = document.createTextNode(String(select(store.getState())));
+    useMount(() => {
+      const unsubscribe = store.subscribe((state) => {
+        textNode.textContent = String(select(state));
+      });
 
-  render();
-  return store.subscribe(render);
+      return () => {
+        unsubscribe();
+      };
+    });
+
+    return textNode;
+  }) as Text;
 }

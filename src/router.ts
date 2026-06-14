@@ -22,15 +22,16 @@ interface RouterOptions {
 
 function parseParams(template: string, actual: string): Params | null {
   const templateParts = template.split("/").filter(Boolean);
+  const templateLength = templateParts.length;
   const actualParts = actual.split("/").filter(Boolean);
 
-  if (templateParts.length !== actualParts.length) {
+  if (templateLength !== actualParts.length) {
     return null;
   }
 
   const params: Params = {};
 
-  for (let i = 0; i < templateParts.length; i += 1) {
+  for (let i = 0; i < templateLength; i += 1) {
     const t = templateParts[i];
     const a = actualParts[i];
 
@@ -74,7 +75,11 @@ export function createRouter(routes: RouteConfig<any>[], options: RouterOptions)
 
     const { route, params } = matched;
 
-    options.onRouteChange?.({ loading: true, path: route.path, name: route.name });
+    options.onRouteChange?.({
+      loading: true,
+      path: route.path,
+      name: route.name
+    });
 
     const data = route.loader ? await route.loader({ params, path }) : undefined;
     const module = await route.component();
@@ -82,7 +87,11 @@ export function createRouter(routes: RouteConfig<any>[], options: RouterOptions)
 
     outlet.replaceChildren(view);
 
-    options.onRouteChange?.({ loading: false, path: route.path, name: route.name });
+    options.onRouteChange?.({
+      loading: false,
+      path: route.path,
+      name: route.name
+    });
   };
 
   const onClick = (event: MouseEvent) => {
