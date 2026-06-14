@@ -47,8 +47,8 @@ function appendReactiveChild(parent: Node, binding: ReactiveBinding<any>): void 
   parent.appendChild(startAnchor);
   parent.appendChild(endAnchor);
 
-  useReactiveEffect((computedValues) => {
-    const freshValue = binding.compute(computedValues);
+  useReactiveEffect((...computedValues) => {
+    const freshValue = binding.compute(...computedValues);
 
     // Clear out whatever old node layouts were rendered in the previous microtask loop
     clearDynamicNodes(startAnchor, endAnchor);
@@ -101,7 +101,7 @@ const LIVE_PROPERTIES = new Set(["value", "checked", "disabled", "muted", "selec
 function setProp(el: HTMLElement, key: string, value: unknown): void {
   // Intercept reactive bindings bound to properties
   if (isReactiveBinding(value)) {
-    useReactiveEffect((values) => setProp(el, key, value.compute(values)), value.deps as any);
+    useReactiveEffect((...values) => setProp(el, key, value.compute(...values)), value.deps as any);
     return;
   }
 

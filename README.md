@@ -70,7 +70,7 @@ import type {
 ```ts
 import { For } from "@gajebodev/jsx-core/for";
 import { ErrorBoundary } from "@gajebodev/jsx-core/error";
-import { jsx as jsxDEV } from "@gajebodev/jsx-core/jsx-dev-runtime";
+import { jsxDEV } from "@gajebodev/jsx-core/jsx-dev-runtime";
 ```
 
 ## Core Ecosystem Guides
