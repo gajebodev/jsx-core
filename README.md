@@ -11,7 +11,7 @@ Unlike traditional Virtual DOM frameworks (like React), components in this archi
 - 🚀 **Single-Execution Components**: Functions evaluate exactly once on setup. No re-rendering overhead.
 - 🧬 **Mutation-Driven Lifecycles**: `useMount` and `useUnmount` connect natively to browser insertions/removals via a background `MutationObserver`.
 - 🔄 **Deep Proxy Reactivity**: Track nested properties and index alterations cleanly using an optimized, cached `useReactive` proxy framework.
-- 🧱 **Structural Control Components**: `Show`, `For`, and `ErrorBoundary` provide direct-to-DOM control flow without reconciliation.
+- 🧱 **Structural Control Components**: `For`, and `ErrorBoundary` provide direct-to-DOM control flow without reconciliation.
 - 🧭 **Built-In Router and Store Utilities**: `createRouter`, `createStore`, and `$text` cover common SPA needs.
 - 🎨 **Lightweight Utilities**: `cx` for conditional class binding, Fragment support, and ref callbacks.
 
@@ -69,7 +69,6 @@ import type {
 
 ```ts
 import { For } from "@gajebodev/jsx-core/for";
-import { Show } from "@gajebodev/jsx-core/show";
 import { ErrorBoundary } from "@gajebodev/jsx-core/error";
 import { jsx as jsxDEV } from "@gajebodev/jsx-core/jsx-dev-runtime";
 ```
@@ -225,8 +224,10 @@ export function PriceCalculator() {
         Total:{" "}
         {$reactive(
           (price, tax) => `$${(price * (1 + tax)).toFixed(2)}`,
-          [state, "price"],
-          [state, "tax"]
+          [
+            [state, "price"],
+            [state, "tax"]
+          ]
         )}
       </span>
 
